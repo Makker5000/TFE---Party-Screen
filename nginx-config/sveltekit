@@ -1,18 +1,57 @@
+# server {
+#	listen 80;
+#	server_name 192.168.1.10;
+
+#	location / {
+#		proxy_pass http://127.0.0.1:3000/;
+#                proxy_set_header Host $host;
+#                proxy_set_header X-Real-IP $remote_addr;
+#                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#	}
+
+#	location /api/ {
+#		proxy_pass http://127.0.0.1:8000/;
+#		proxy_set_header Host $host;
+#                proxy_set_header X-Real-IP $remote_addr;
+#                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#	}
+#}
+
 server {
-	listen 80;
-	server_name 192.168.1.10;
+    listen 80;
+    server_name 192.168.1.10;
 
-	location / {
-		proxy_pass http://127.0.0.1:3000/;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-	}
+    # Logs personnalisés
+    access_log /var/log/nginx/app_access.log;
+    error_log  /var/log/nginx/app_error.log;
 
-	location /api/ {
-		proxy_pass http://127.0.0.1:8000/;
-		proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-	}
+    # FRONTEND - SvelteKit
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+
+        access_log /var/log/nginx/frontend_access.log;
+        error_log  /var/log/nginx/frontend_error.log;
+    }
+
+    # BACKEND - FastAPI
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        access_log /var/log/nginx/backend_access.log;
+        error_log  /var/log/nginx/backend_error.log;
+    }
+
+    error_page 404 /404.html;
 }
