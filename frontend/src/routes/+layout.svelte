@@ -39,7 +39,7 @@
 <script>
 	import '$app/environment';
 	import '../app.css';
-	import NavBar from '$lib/components/NavBar.svelte';
+	import NavBar from '$lib/components/Navbar.svelte';
 	import { page } from '$app/stores';
 </script>
 
