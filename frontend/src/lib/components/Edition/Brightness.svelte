@@ -5,7 +5,8 @@
 
   async function updateBrightness(val) {
     console.log("Brigthness value : ", val);
-    await fetch('http://localhost:8000/api/edition/brightness', {
+    // await fetch('http://localhost:8000/api/edition/brightness', {
+    await fetch('/api/edition/brightness', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brightness: val })

@@ -20,7 +20,8 @@
         state: "play"
       };
 
-      await fetch('http://localhost:8000/api/edition/ads/play', {
+      // await fetch('http://localhost:8000/api/edition/ads/play', {
+      await fetch('/api/edition/ads/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -38,7 +39,8 @@
         state: "stop"
       };
 
-      await fetch('http://localhost:8000/api/edition/ads/stop', { 
+      // await fetch('http://localhost:8000/api/edition/ads/stop', {
+      await fetch('/api/edition/ads/stop', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)

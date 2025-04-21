@@ -4,7 +4,8 @@
     export let defaultUrl = '';
 
     async function generateQRCode(url) {
-        await fetch('http://localhost:8000/api/edition/qrcode', {
+        // await fetch('http://localhost:8000/api/edition/qrcode', {
+        await fetch('/api/edition/qrcode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -14,7 +15,8 @@
     }
 
     async function playQrCode(){
-        await fetch('http://localhost:8000/api/edition/qrcode/play', {
+        // await fetch('http://localhost:8000/api/edition/qrcode/play', {
+        await fetch('/api/edition/qrcode/play', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -24,7 +26,8 @@
     }
 
     async function stopQrCode(){
-        await fetch('http://localhost:8000/api/edition/qrcode/stop', {
+        // await fetch('http://localhost:8000/api/edition/qrcode/stop', {
+        await fetch('/api/edition/qrcode/stop', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

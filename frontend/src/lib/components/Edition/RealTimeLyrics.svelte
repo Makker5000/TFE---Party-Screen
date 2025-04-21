@@ -15,7 +15,8 @@
         animation: animation
       };
 
-      await fetch('http://localhost:8000/api/edition/lyrics/play', {
+      // await fetch('http://localhost:8000/api/edition/lyrics/play', {
+      await fetch('/api/edition/lyrics/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -24,7 +25,10 @@
     }
 
     async function stopLyrics() {
-      await fetch('http://localhost:8000/api/edition/lyrics/stop', { method: 'POST' });
+      // await fetch('http://localhost:8000/api/edition/lyrics/stop', { 
+      await fetch('/api/edition/lyrics/stop', { 
+        method: 'POST' 
+      });
       console.log("Stop Real-time Lyrics Display");
     }
 </script>

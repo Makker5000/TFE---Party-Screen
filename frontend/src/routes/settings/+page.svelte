@@ -11,7 +11,8 @@
 	// Envoie immédiat pour Power
 	async function updatePower(state) {
 		console.log(state);
-		await fetch('http://localhost:8000/api/settings/power', {
+		// await fetch('http://localhost:8000/api/settings/power', {
+		await fetch('/api/settings/power', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ power: state })
@@ -26,7 +27,8 @@
 			screenShape: screenShape
 		};
 
-		await fetch('http://localhost:8000/api/settings/config', {
+		// await fetch('http://localhost:8000/api/settings/config', {
+		await fetch('/api/settings/config', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload)

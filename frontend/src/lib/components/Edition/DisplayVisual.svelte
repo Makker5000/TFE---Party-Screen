@@ -19,7 +19,8 @@
         // formData.append('file', payload);
         formData.append('file', file);
 
-        const res = await fetch('http://localhost:8000/api/edition/visual/upload', {
+        // const res = await fetch('http://localhost:8000/api/edition/visual/upload', {
+        const res = await fetch('/api/edition/visual/upload', {
             method: 'POST',
             body: formData
         });
@@ -29,7 +30,8 @@
     }
 
     async function stopVisual(){
-        await fetch('http://localhost:8000/api/edition/visual/stop', {
+        // await fetch('http://localhost:8000/api/edition/visual/stop', {
+        await fetch('/api/edition/visual/stop', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
