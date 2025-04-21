@@ -11,6 +11,7 @@ class MessageModel(BaseModel):
 async def send_message(data: MessageModel):
     # Publier sur MQTT
     message = data.message
-    topic = "topic/esp8266"
+    # topic = "topic/esp8266"
+    topic = "esp/pere/commande"
     publish_message(topic, message)
     return {"status": "Message envoyé", "message": message}
