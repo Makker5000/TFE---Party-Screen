@@ -11,11 +11,11 @@ router = APIRouter()
 async def set_power(data: PowerModel):
     if data.power == True :
         payload = { 
-            "flag": "POWER_ON",
+            "FLAG": "POWER_ON",
         }
     elif data.power == False :
         payload = { 
-            "flag": "POWER_OFF",
+            "FLAG": "POWER_OFF",
         }
 
     publish(MQTT_TOPIC, payload)
@@ -38,7 +38,7 @@ os.makedirs("app/data", exist_ok=True)
 @router.post("/config")
 async def apply_settings(data: SettingsModel):
     payload = {
-        "flag": "CONFIG",
+        "FLAG": "CONFIG",
         "screenCount": data.screenCount,
         "matrixCount": data.matrixCount,
         "screenShape": data.screenShape

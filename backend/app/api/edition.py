@@ -132,7 +132,7 @@ async def upload_visual(file: UploadFile = File(...)):
 
     file_url = f"http://localhost:8000/static/visuals/{unique_filename}"
     payload = {
-        "flag": "ARTIST_VISUAL",
+        "FLAG": "ARTIST_VISUAL",
         "file_url": file_url
     }
     publish(MQTT_TOPIC, str(payload))
