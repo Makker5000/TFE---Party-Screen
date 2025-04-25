@@ -63,7 +63,7 @@
     <select bind:value={animation}>
       {#each availableAnimations as a}<option selected={a === 'scroll'}>{a}</option>{/each}
     </select>
-    <input type="range" min="0.1" max="5" step="0.1" bind:value={speed} />
+    <input type="range" min="0" max="10" step="1" bind:value={speed} />
     <input type="text" placeholder="Enter ad message" bind:value={content} />
     <button on:click={() => playAds(textColor, backgroundColor, font, animation, speed, content)}>Play</button>
     <button on:click={() => stopAds()}>Stop</button>
