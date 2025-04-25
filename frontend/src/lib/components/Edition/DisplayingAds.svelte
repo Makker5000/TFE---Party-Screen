@@ -2,12 +2,12 @@
     export let textColor = 'white';
     export let backgroundColor = 'black';
     export let font = 'Arial';
-    export let animation = 'scroll';
+    export let animation = 'scroll_left';
     export let speed = 1;
     export let content = '';
-    export let availableColors = ['white', 'black', 'yellow'];
+    export let availableColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple'];
     export let availableFonts = ['Arial', 'Verdana'];
-    export let availableAnimations = ['scroll', 'bounce', 'none'];
+    export let availableAnimations = ['scroll_left', 'scroll_right', 'bounce', 'none'];
 
     async function playAds(textColor, backgroundColor, font, animation, speed, content) {
       const config = {
@@ -61,11 +61,11 @@
       {#each availableFonts as f}<option>{f}</option>{/each}
     </select>
     <select bind:value={animation}>
-      {#each availableAnimations as a}<option selected={a === 'scroll'}>{a}</option>{/each}
+      {#each availableAnimations as a}<option selected={a === 'scroll_left'}>{a}</option>{/each}
     </select>
     <input type="range" min="0" max="10" step="1" bind:value={speed} />
     <input type="text" placeholder="Enter ad message" bind:value={content} />
-    <button on:click={() => playAds(textColor, backgroundColor, font, animation, speed, content)}>Play</button>
+    <button on:click={() => playAds(textColor, backgroundColor, font, animation, speed, content)} >Play</button>
     <button on:click={() => stopAds()}>Stop</button>
     <button>Save</button>
 </div>
