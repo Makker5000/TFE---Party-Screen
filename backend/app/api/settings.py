@@ -7,11 +7,13 @@ import os, json
 
 router = APIRouter()
 
-current_power = False;
+current_power: bool = 'true';
 
 @router.post("/power")
 async def set_power(data: PowerModel):
-    current_power = data.power;
+    global current_power 
+    current_power = data.power
+
     if current_power == True :
         payload = { 
             "FLAG": "POWER_ON",
@@ -25,11 +27,11 @@ async def set_power(data: PowerModel):
     return {"status": "ok", "sent": payload}
 
 @router.get("/power")
-async def get_brightness():
+async def get_power():
     """
     Renvoie la dernière valeur de l'état Power.
     """
-    return {"Power": current_power}
+    return {"power": current_power}
 
 # @router.post("/config")
 # async def apply_settings(data: SettingsModel):

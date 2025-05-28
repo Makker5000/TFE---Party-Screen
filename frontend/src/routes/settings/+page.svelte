@@ -12,10 +12,11 @@
   // Au montage, on récupère l'état courant côté backend
   onMount(async () => {
     try {
-      // const res = await fetch('http://localhost:8000/api/settings/power');
+      // const res = await fetch('http://localhost:8000/api/settings/power', { method: 'GET' });
       const res = await fetch('/api/settings/power');
       const json = await res.json();
       power = json.power;
+      console.log("L'état de Power : ", json.power);
     } catch (e) {
       console.error("Impossible de charger l'état allumé :", e);
       power = false; // fallback
@@ -24,8 +25,8 @@
 
   async function togglePower() {
     power = !power;
-    // await fetch('http://localhost:8000/api/settings/power', {
-    await fetch('/api/settings/power', {
+    await fetch('http://localhost:8000/api/settings/power', {
+    // await fetch('/api/settings/power', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ power })
