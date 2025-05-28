@@ -1,5 +1,6 @@
 <script>
   import { writable } from 'svelte/store';
+  import { onMount } from 'svelte';
 
   export let power = false;
   export let screenCount = '';
