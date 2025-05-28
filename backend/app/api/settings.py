@@ -7,19 +7,29 @@ import os, json
 
 router = APIRouter()
 
+current_power = False;
+
 @router.post("/power")
 async def set_power(data: PowerModel):
-    if data.power == True :
+    current_power = data.power;
+    if current_power == True :
         payload = { 
             "FLAG": "POWER_ON",
         }
-    elif data.power == False :
+    elif current_power == False :
         payload = { 
             "FLAG": "POWER_OFF",
         }
 
     publish(MQTT_TOPIC, payload)
     return {"status": "ok", "sent": payload}
+
+@router.get("/power")
+async def get_brightness():
+    """
+    Renvoie la dernière valeur de l'état Power.
+    """
+    return {"Power": current_power}
 
 # @router.post("/config")
 # async def apply_settings(data: SettingsModel):

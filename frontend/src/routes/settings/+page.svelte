@@ -8,6 +8,19 @@
 
   export const screenShapes = ["Square", "Line", "Horizontal Rectangle", "Vertical Rectangle"];
 
+  // Au montage, on récupère l'état courant côté backend
+  onMount(async () => {
+    try {
+      // const res = await fetch('http://localhost:8000/api/settings/power');
+      const res = await fetch('/api/settings/power');
+      const json = await res.json();
+      power = json.power;
+    } catch (e) {
+      console.error("Impossible de charger l'état allumé :", e);
+      power = false; // fallback
+    }
+  });
+
   async function togglePower() {
     power = !power;
     // await fetch('http://localhost:8000/api/settings/power', {
