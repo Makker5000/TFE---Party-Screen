@@ -31,6 +31,7 @@ async def get_power():
     """
     Renvoie la dernière valeur de l'état Power.
     """
+    print(f"Power state : {current_power}")
     return {"power": current_power}
 
 # @router.post("/config")
