@@ -25,8 +25,8 @@
 
   async function togglePower() {
     power = !power;
-    await fetch('http://localhost:8000/api/settings/power', {
-    // await fetch('/api/settings/power', {
+    // await fetch('http://localhost:8000/api/settings/power', {
+    await fetch('/api/settings/power', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ power })
