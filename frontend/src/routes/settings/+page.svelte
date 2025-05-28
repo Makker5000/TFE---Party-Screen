@@ -13,7 +13,7 @@
   onMount(async () => {
     try {
       // const res = await fetch('http://localhost:8000/api/settings/power', { method: 'GET' });
-      const res = await fetch('/api/settings/power');
+      const res = await fetch('/api/settings/power', { method: 'GET' });
       const json = await res.json();
       power = json.power;
       console.log("L'état de Power : ", json.power);
