@@ -1,71 +1,137 @@
-<script>
-    export let textColor = 'white';
-    export let backgroundColor = 'black';
-    export let font = 'Arial';
-    export let animation = 'scroll_left';
-    export let speed = 1;
-    export let content = '';
-    export let availableColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple'];
-    export let availableFonts = ['Arial', 'Verdana'];
-    export let availableAnimations = ['scroll_left', 'scroll_right', 'bounce', 'none'];
+<script lang="ts">
+  import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
 
-    async function playAds(textColor, backgroundColor, font, animation, speed, content) {
-      const config = {
-        textColor: textColor,
-        backgroundColor: backgroundColor,
-        font: font,
-        animation: animation,
-        speed: speed,
-        content: content,
-        state: "play"
-      };
+  let textColor = 'white';
+  let backgroundColor = 'black';
+  let font = 'Arial';
+  let animation = 'scroll_left';
+  let speed = 1;
+  let content = '';
+  let availableTextColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple'];
+  let availableBgColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple', 'black'];
+  let availableFonts = ['Arial', 'Verdana'];
+  let availableAnimations = ['scroll_left', 'scroll_right', 'bounce', 'none'];
 
-      // await fetch('http://localhost:8000/api/edition/ads/play', {
-      await fetch('/api/edition/ads/play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
-    }
+  export let data: {
+    textColor: string;
+    backgroundColor: string;
+    font: string;
+    animation: string;
+    speed: number;
+    content: string;
+  } = {
+    textColor: textColor,
+    backgroundColor: backgroundColor,
+    font: font,
+    animation: animation,
+    speed: speed,
+    content: content,
+  };
+  export let editMode: boolean = false;
+  let active = false;
+  let showModal = false;
 
-    async function stopAds() {
-      const config = {
-        textColor: '',
-        backgroundColor: '',
-        font: '',
-        animation: '',
-        speed: 0,
-        content: '',
-        state: "stop"
-      };
+  function openSavePresetModal() {
+    showModal = true;
+  }
 
-      // await fetch('http://localhost:8000/api/edition/ads/stop', {
-      await fetch('/api/edition/ads/stop', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
-      console.log("Stop Displaying Ads");
-    }
+  async function handleSavePreset(presetName: string) {
+    const presetData = { 
+      type: 'ads',
+      name: presetName,
+      data: { ...data } };
+    // const method = editMode ? 'PUT' : 'POST';
+    // const url = editMode && data ? `/api/presets/${data.id}` : '/api/presets';
+    // const url = 'http://localhost:8000/api/presets';
+    const url = '/api/presets';
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(presetData)
+    });
+    showModal = false;
+  }
+
+  async function toggleAds() {
+    const config = { ...data, state: active ? 'stop' : 'play' };
+    const url = active ? '/api/edition/ads/stop' : '/api/edition/ads/play';
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+    active = !active;
+  }
 </script>
-  
-<div class="section">
-    <h2>Displaying Ads</h2>
-    <select bind:value={textColor}>
-      {#each availableColors as color}<option>{color}</option>{/each}
+
+<div class="flex flex-col items-center space-y-4 py-4 text-white">
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Text Color</span></label>
+    <select bind:value={data.textColor} class="select select-bordered w-full">
+      {#each availableTextColors as color}
+        <option value={color}>{color}</option>
+      {/each}
     </select>
-    <select bind:value={backgroundColor}>
-      {#each availableColors as color}<option>{color}</option>{/each}
+  </div>
+
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Background Color</span></label>
+    <select bind:value={data.backgroundColor} class="select select-bordered w-full">
+      {#each availableBgColors as color}
+        <option value={color}>{color}</option>
+      {/each}
     </select>
-    <select bind:value={font}>
-      {#each availableFonts as f}<option>{f}</option>{/each}
+  </div>
+
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Font</span></label>
+    <select bind:value={data.font} class="select select-bordered w-full">
+      {#each availableFonts as f}
+        <option value={f}>{f}</option>
+      {/each}
     </select>
-    <select bind:value={animation}>
-      {#each availableAnimations as a}<option selected={a === 'scroll_left'}>{a}</option>{/each}
+  </div>
+
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Animation</span></label>
+    <select bind:value={data.animation} class="select select-bordered w-full">
+      {#each availableAnimations as a}
+        <option value={a}>{a}</option>
+      {/each}
     </select>
-    <input type="range" min="0" max="10" step="1" bind:value={speed} />
-    <input type="text" placeholder="Enter ad message" bind:value={content} />
-    <button on:click={() => playAds(textColor, backgroundColor, font, animation, speed, content)} >Play</button>
-    <button on:click={() => stopAds()}>Stop</button>
-    <button>Save</button>
+  </div>
+
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Speed</span></label>
+    <input type="range" min="0" max="10" step="1" bind:value={data.speed} class="range range-accent w-full" />
+  </div>
+
+  <div class="w-full max-w-xs">
+    <label class="label"><span class="label-text">Content</span></label>
+    <input type="text" bind:value={data.content} placeholder="Enter a message" class="input input-bordered w-full" />
+  </div>
+
+  {#if !editMode}
+    <div class="flex space-x-2">
+      <button
+        on:click={toggleAds}
+        class="btn btn-outline btn-sm btn-lg"
+        class:btn-success={!active}
+        class:btn-error={active}
+      >
+        {active ? 'Stop' : 'Play'}
+      </button>
+      <button 
+        class="btn btn-outline btn-sm btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
+        on:click={openSavePresetModal}
+      >
+        Save
+      </button>
+    </div>
+    <SavePresetModal
+      open={showModal}
+      on:save={(e) => handleSavePreset(e.detail)}
+      on:cancel={() => (showModal = false)}
+    />
+  {/if}
 </div>

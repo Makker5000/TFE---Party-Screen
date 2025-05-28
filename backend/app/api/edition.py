@@ -11,9 +11,15 @@ import json
 
 router = APIRouter()
 
-# --------------- BRIGTHNESS ----------------
+# ----------------- BRIGTHNESS ------------------
+# Stockage en mémoire de la dernière valeur reçue
+_current_brightness: int = 0
+
 @router.post("/brightness")
 async def set_brightness(data: BrightnessModel):
+    global _current_brightness
+    _current_brightness = data.brightness
+
     payload = {
         "FLAG": "BRIGHTNESS",
         "value": data.brightness
@@ -21,6 +27,12 @@ async def set_brightness(data: BrightnessModel):
     publish(MQTT_TOPIC, payload)
     return {"status": "ok", "sent": payload}
 
+@router.get("/brightness")
+async def get_brightness():
+    """
+    Renvoie la dernière valeur de luminosité réglée.
+    """
+    return {"brightness": _current_brightness}
 
 # --------------- ARTIST VISUALS ----------------
 # @router.post("/visual/play")
@@ -193,12 +205,12 @@ async def generate_qrcode(data: QRCodeModel):
     else:
         settings = {
             "screenCount": 1,
-            "matrixCount": 4,
+            "matrixCount": 9,
             "screenShape": "square"
         }
 
     screen_count = settings.get("screenCount", 1)
-    matrix_count = settings.get("matrixCount", 4)
+    matrix_count = settings.get("matrixCount", 9)
     screen_shape = settings.get("screenShape", "square")
 
     # Étape 4 : Redimensionnement du QR code

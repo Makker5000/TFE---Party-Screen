@@ -1,147 +1,74 @@
-<!-- <script>
-    import { goto } from '$app/navigation';
-  
-    const links = [
-      { name: 'Settings', href: '/settings' },
-      { name: 'Edit', href: '/edit' },
-      { name: 'Presets', href: '/presets' },
-      { name: 'Account', href: '/account' }
-    ];
-</script>
-  
-<nav class="nav-container">
-  {#each links as link}
-    <button on:click={() => goto(link.href)}>{link.name}</button>
-  {/each}
-</nav>
-  
-<style>
-  .nav-container {
-    display: flex;
-    justify-content: space-around;
-    background-color: #222;
-    color: white;
-    padding: 1rem;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-  }
-
-  button {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: 1rem;
-  }
-
-  @media(min-width: 768px) {
-    .nav-container {
-      top: 0;
-      bottom: auto;
-    }
-  }
-</style> -->
-
-<!-- _________________________________________________________________ -->
-
-<!-- <script>
+<script>
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { tweened } from 'svelte/motion';
+  import { cubicOut } from 'svelte/easing';
+
   const pages = [
-    { href: '/edit', icon: '✏️' },
     { href: '/settings', icon: '⚙️' },
-    { href: '/presets', icon: '🔖' },
-    { href: '/account', icon: '👤' },
+    { href: '/edition',  icon: '✏️' },
+    { href: '/presets',  icon: '🔖' },
+    { href: '/account',  icon: '👤' },
   ];
+
+  // Animations
+  let underlineX     = tweened(0, { duration: 300, easing: cubicOut });
+  let underlineWidth = tweened(0, { duration: 300, easing: cubicOut });
+
+  // Référence au conteneur des boutons
+  let containerEl;
+
+  function updateCursor() {
+    if (typeof document === 'undefined' || !containerEl) return;
+    const btns = containerEl.querySelectorAll('.nav-btn');
+    const idx  = pages.findIndex(p => p.href === $page.url.pathname);
+    const el   = btns[idx];
+    if (el) {
+      const parentRect = containerEl.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      underlineX.set(elRect.left - parentRect.left);
+      underlineWidth.set(elRect.width);
+    }
+  }
+
+  // Met à jour au changement de page
+  $: $page, setTimeout(updateCursor, 0);
+
+  onMount(() => {
+    updateCursor();
+    window.addEventListener('resize', updateCursor);
+  });
 </script>
 
-<div class="btm-nav fixed bottom-0 w-full z-50">
-  {#each pages as p}
-    <button
-      on:click={() => goto(p.href)}
-      class={$page.url.pathname === p.href ? 'text-blue-500' : 'text-black'}>
-      <span>{p.icon}</span>
-    </button>
-  {/each}
-</div> -->
+<style>
+  @media (max-width: 640px) {
+    nav { top: auto; bottom: 0; }
+  }
+</style>
 
-<!-- _________________________________________________________________ -->
+<nav class="fixed top-0 left-0 w-full z-50">
+  <div class="mx-auto max-w-md">
+    <div class="card bg-white shadow-md">
+      <!-- Container pour référence et positionnement relatif -->
+      <div class="relative flex justify-around py-3" bind:this={containerEl}>
+        {#each pages as p}
+          <button
+            class="nav-btn text-3xl hover:text-blue-500 transition-colors"
+            on:click={() => goto(p.href)}
+          >
+            <span class={$page.url.pathname === p.href ? 'text-blue-600' : 'text-gray-500'}>
+              {p.icon}
+            </span>
+          </button>
+        {/each}
 
-<!-- <script>
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-
-	const pages = [
-		{ href: '/edit', icon: '✏️' },
-		{ href: '/settings', icon: '⚙️' },
-		{ href: '/presets', icon: '🔖' },
-		{ href: '/account', icon: '👤' },
-	];
-</script>
-
-<div class="btm-nav fixed bottom-0 w-full z-50 bg-base-100">
-	{#each pages as p}
-		<button
-			class="text-3xl"
-			on:click={() => goto(p.href)}>
-			<span class={$page.url.pathname === p.href ? 'text-primary' : 'text-neutral'}>
-				{p.icon}
-			</span>
-		</button>
-	{/each}
-</div> -->
-
-<!-- _________________________________________________________________ -->
-
-<!-- <script>
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-
-	const pages = [
-		{ href: '/edit', icon: '✏️' },
-		{ href: '/settings', icon: '⚙️' },
-		{ href: '/presets', icon: '🔖' },
-		{ href: '/account', icon: '👤' },
-	];
-</script>
-
-<div class="fixed bottom-0 w-full z-50 bg-white dark:bg-gray-900 shadow-md flex justify-around py-2">
-	{#each pages as p}
-		<button
-			class="text-3xl"
-			on:click={() => goto(p.href)}>
-			<span class={$page.url.pathname === p.href ? 'text-blue-600' : 'text-gray-500'}>
-				{p.icon}
-			</span>
-		</button>
-	{/each}
-</div> -->
-
-<!-- _________________________________________________________________ -->
-
-<script>
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-
-	const pages = [
-    { href: '/settings', icon: '⚙️' },
-		{ href: '/edition', icon: '✏️' },
-		{ href: '/presets', icon: '🔖' },
-		{ href: '/account', icon: '👤' },
-	];
-</script>
-
-<nav class="fixed top-0 left-0 w-full bg-white border-b shadow z-50">
-	<div class="flex justify-center gap-6 py-3">
-		{#each pages as p}
-			<button
-				class="text-3xl hover:text-blue-500 transition-colors"
-				on:click={() => goto(p.href)}
-			>
-				<span class={$page.url.pathname === p.href ? 'text-blue-600' : 'text-gray-500'}>
-					{p.icon}
-				</span>
-			</button>
-		{/each}
-	</div>
+        <!-- Curseur animé -->
+        <div
+          class="absolute bottom-0 left-0 h-1 bg-blue-500 rounded transition-all duration-300"
+          style="transform: translateX({$underlineX}px); width: {$underlineWidth}px;"
+        ></div>
+      </div>
+    </div>
+  </div>
 </nav>

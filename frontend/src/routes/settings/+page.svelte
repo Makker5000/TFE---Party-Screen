@@ -1,103 +1,109 @@
 <script>
-	import { writable } from 'svelte/store';
+  import { writable } from 'svelte/store';
 
-	export let power = false;
-	export let screenCount = '';
-	export let matrixCount = '';
-	export let screenShape = '';
+  export let power = false;
+  export let screenCount = '';
+  export let matrixCount = '';
+  export let screenShape = '';
 
-	export const screenShapes = ["Square", "Grid", "Line", "Pyramid", "Circle"];
+  export const screenShapes = ["Square", "Line", "Horizontal Rectangle", "Vertical Rectangle"];
 
-	// Envoie immédiat pour Power
-	async function updatePower(state) {
-		console.log(state);
-		// await fetch('http://localhost:8000/api/settings/power', {
-		await fetch('/api/settings/power', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ power: state })
-		});
-	}
+  async function togglePower() {
+    power = !power;
+    // await fetch('http://localhost:8000/api/settings/power', {
+    await fetch('/api/settings/power', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ power })
+    });
+  }
 
-	// Envoie du Formulaire
-	async function submitSettings(screenCount, matrixCount, screenShape) {
-		const payload = {
-			screenCount: screenCount,
-			matrixCount: matrixCount,
-			screenShape: screenShape
-		};
-
-		// await fetch('http://localhost:8000/api/settings/config', {
-		await fetch('/api/settings/config', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload)
-		});
-	}
-
-
+  async function submitSettings() {
+    const payload = { screenCount, matrixCount, screenShape };
+    // await fetch('http://localhost:8000/api/settings/config', {
+    await fetch('/api/settings/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
 </script>
 
-<svelte:head><title>Settings</title></svelte:head>
+<svelte:head>
+  <title>Settings</title>
+</svelte:head>
 
-<h1 class="text-2xl">Page Screen Settings</h1>
-<!-- Formulaire principal -->
-<div class="flex flex-col gap-6 mt-4 max-w-md w-full mx-auto">
-	<!-- Power -->
-	<section class="border rounded-xl p-4 shadow-sm bg-gray-100">
-		<h2 class="text-lg font-semibold mb-2">Power on / off</h2>
-		<input
-			type="checkbox"
-			class="w-5 h-5"
-			bind:checked={power}
-			on:change={() => updatePower(power)}
-		/>
-	</section>
+<div class="min-h-screen flex flex-col items-center py-8 px-4">
+  <h1 class="text-center text-4xl text-black font-bold mb-8">Screen Settings</h1>
 
-	<!-- Number of Screen -->
-	<section class="border rounded-xl p-4 shadow-sm bg-gray-100">
-		<h2 class="text-lg font-semibold mb-2">Number of Screen</h2>
-		<input
-			type="number"
-			min="0"
-			max="10"
-			class="border p-2 rounded w-full"
-			bind:value={screenCount}
-		/>
-	</section>
+  <div class="w-full max-w-md space-y-6">
+    <!-- Power Card -->
+    <div class="card bg-base-100 shadow-md mx-auto">
+      <div class="card-body items-center">
+        <h2 class="card-title">Power</h2>
+        <button
+          on:click={togglePower}
+          class="btn btn-circle btn-outline btn-lg"
+          class:btn-success={!power}
+          class:btn-error={power}
+        >
+          {power ? 'Off' : 'On'}
+        </button>
+      </div>
+    </div>
 
-	<!-- Number of Matrix -->
-	<section class="border rounded-xl p-4 shadow-sm bg-gray-100">
-		<h2 class="text-lg font-semibold mb-2">Number of Matrix</h2>
-		<input
-			type="number"
-			min="0"
-			max="10"
-			class="border p-2 rounded w-full"
-			bind:value={matrixCount}
-			disabled={!screenCount || Number(screenCount) === 0}
-		/>
-	</section>
+    <!-- Screen Count Card -->
+    <div class="card bg-base-100 shadow-md mx-auto">
+      <div class="card-body items-center">
+        <h2 class="card-title">Number of Screens</h2>
+        <input
+          type="number"
+          min="0"
+          max="10"
+          bind:value={screenCount}
+          class="input input-bordered w-full"
+        />
+      </div>
+    </div>
 
-	<!-- Screen Shape -->
-	<section class="border rounded-xl p-4 shadow-sm bg-gray-100">
-		<h2 class="text-lg font-semibold mb-2">Screen Shape</h2>
-		<select
-			class="border p-2 rounded w-full"
-			bind:value={screenShape}
-			disabled={!screenCount || Number(screenCount) === 0}
-		>
-			{#each screenShapes as shape}
-				<option value={shape}>{shape}</option>
-			{/each}
-		</select>
-	</section>
+    <!-- Matrix Count Card -->
+    <div class="card bg-base-100 shadow-md mx-auto">
+      <div class="card-body items-center">
+        <h2 class="card-title">Number of Matrices</h2>
+        <input
+          type="number"
+          min="0"
+          max="10"
+          bind:value={matrixCount}
+          disabled={!screenCount || Number(screenCount) === 0}
+          class="input input-bordered w-full disabled:opacity-50"
+        />
+      </div>
+    </div>
 
-	<!-- Submit All -->
-	<button
-		class="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-		on:click={() => submitSettings(screenCount, matrixCount, screenShape)}
-	>
-		Apply
-	</button>
+    <!-- Screen Shape Card -->
+    <div class="card bg-base-100 shadow-md mx-auto">
+      <div class="card-body items-center">
+        <h2 class="card-title">Screen Shape</h2>
+        <select
+          bind:value={screenShape}
+          disabled={!screenCount || Number(screenCount) === 0}
+          class="select select-bordered w-full disabled:opacity-50"
+        >
+          <option value="" disabled selected>Select shape</option>
+          {#each screenShapes as shape}
+            <option value={shape}>{shape}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
+
+    <!-- Apply Button -->
+    <button
+      on:click={submitSettings}
+      class="btn btn-primary btn-block"
+    >
+      Apply Settings
+    </button>
+  </div>
 </div>

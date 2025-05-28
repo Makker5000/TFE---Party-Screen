@@ -1,33 +1,45 @@
 <script>
-  export let brightness = 55;
+  import { onMount } from 'svelte';
 
-  let currentBrightness = brightness;
+  // On ignore la prop exportée si tu ne l'utilises plus
+  // export let brightness = 55;
+  let currentBrightness = 0; 
 
-  async function updateBrightness(val) {
-    console.log("Brigthness value : ", val);
-    // await fetch('http://localhost:8000/api/edition/brightness', {
-    await fetch('/api/edition/brightness', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brightness: val })
-    });
-  }
+  // Au montage, on récupère l'état courant côté backend
+  onMount(async () => {
+    try {
+      // const res = await fetch('http://localhost:8000/api/edition/brightness');
+      const res = await fetch('/api/edition/brightness');
+      const json = await res.json();
+      currentBrightness = json.brightness ?? 0;
+    } catch (e) {
+      console.error('Impossible de charger la luminosité :', e);
+      currentBrightness = 55; // fallback
+    }
+  });
 
-  function handleChange() {
-    updateBrightness(currentBrightness);
+  // Envoi uniquement quand l'utilisateur lâche le slider
+  async function handleChange() {
+    try {
+      // await fetch('http://localhost:8000/api/edition/brightness', {
+      await fetch('/api/edition/brightness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brightness: currentBrightness })
+      });
+    } catch (e) {
+      console.error('Échec de l\'update brightness :', e);
+    }
   }
 </script>
 
-<div class="section">
-  <h2>Brightness</h2>
+<div class="flex justify-center items-center py-4">
   <input
     type="range"
     min="0"
     max="255"
     bind:value={currentBrightness}
-    on:change={() => handleChange()} />
+    on:change={handleChange}
+    class="range range-accent range-lg w-3/4"
+  />
 </div>
-
-<style>
-  .section { margin-bottom: 2rem; }
-</style>
