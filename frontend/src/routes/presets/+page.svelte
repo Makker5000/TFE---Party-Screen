@@ -46,10 +46,30 @@
 //       console.error(error);
 //     }
 //   }
-  function onPlayStop(event: CustomEvent) {
+  async function onPlayStop(event: CustomEvent) {
     const preset = presets.find(p => p.id === event.detail.id);
     // if (preset) goto(`http://localhost:8000/api/edition/${preset.type}/toggle/${preset.id}`);
-    if (preset) goto(`/api/edition/${preset.type}/toggle/${preset.id}`);
+    // if (preset) goto(`/api/edition/${preset.type}/toggle/${preset.id}`);
+    console.log(preset);
+    if (preset.data.state == "play") {
+        // await fetch(`http://localhost:8000/api/edition/${preset.type}/play`, {
+        await fetch(`/api/edition/${preset.type}/play`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(preset.data)
+        });
+        preset.data.state = "stop";
+        saveModifiedPreset();
+    } else if (preset.data.state == "stop") {
+        // await fetch(`http://localhost:8000/api/edition/${preset.type}/stop`, {
+        await fetch(`/api/edition/${preset.type}/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(preset.data)
+        });
+        preset.data.state = "play";
+        saveModifiedPreset();
+    }
   }
 
 

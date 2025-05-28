@@ -7,10 +7,13 @@
   let animation = 'scroll_left';
   let speed = 1;
   let content = '';
+  let state = 'stop';
   let availableTextColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple'];
   let availableBgColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple', 'black'];
   let availableFonts = ['Arial', 'Verdana'];
   let availableAnimations = ['scroll_left', 'scroll_right', 'bounce', 'none'];
+
+  let active = false;
 
   export let data: {
     textColor: string;
@@ -19,6 +22,7 @@
     animation: string;
     speed: number;
     content: string;
+    state: string;
   } = {
     textColor: textColor,
     backgroundColor: backgroundColor,
@@ -26,9 +30,9 @@
     animation: animation,
     speed: speed,
     content: content,
+    state: active ? 'stop' : 'play',
   };
   export let editMode: boolean = false;
-  let active = false;
   let showModal = false;
 
   function openSavePresetModal() {
@@ -53,7 +57,9 @@
   }
 
   async function toggleAds() {
-    const config = { ...data, state: active ? 'stop' : 'play' };
+    // const config = { ...data, state: active ? 'stop' : 'play' };
+    const config = { ...data };
+    // const url = active ? 'http://localhost:8000/api/edition/ads/stop' : 'http://localhost:8000/api/edition/ads/play';
     const url = active ? '/api/edition/ads/stop' : '/api/edition/ads/play';
     await fetch(url, {
       method: 'POST',
