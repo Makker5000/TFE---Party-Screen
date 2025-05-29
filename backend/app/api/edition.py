@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel
-from app.utils.qrcode import create_qr_code, resize_qr_code
+from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
 from app.core.config import MQTT_TOPIC
 import shutil, os, uuid
@@ -188,38 +188,72 @@ async def upload_visual(file: UploadFile = File(...)):
 #     return {"status": "ok"}
 
 ###################### Fonctionnel avec redimensionnement (Tester affichage QR Code et si mène bien à la Page ###############################
+# DEFAULT_URL = "http://localhost:5173/lyrics"
+
+# @router.post("/qrcode")
+# async def generate_qrcode(data: QRCodeModel):
+#     # Étape 1 : Récupération de l'URL
+#     url = data.url if data.url else DEFAULT_URL
+
+#     # Étape 2 : Génération QR brut
+#     qr_code_bin = create_qr_code(url)
+
+#     # Étape 3 : Lecture de la config écran (fichier JSON temporaire)
+#     if os.path.exists(SETTINGS_PATH):
+#         with open(SETTINGS_PATH, "r") as f:
+#             settings = json.load(f)
+#     else:
+#         settings = {
+#             "screenCount": 1,
+#             "matrixCount": 9,
+#             "screenShape": "square"
+#         }
+
+#     screen_count = settings.get("screenCount", 1)
+#     matrix_count = settings.get("matrixCount", 9)
+#     screen_shape = settings.get("screenShape", "square")
+
+#     # Étape 4 : Redimensionnement du QR code
+#     resized_qr = resize_qr_code(qr_code_bin, screen_count, matrix_count, screen_shape)
+
+#    # Étape 5 : Envoi à l’ESP
+#    # payload = {
+#    #     "FLAG": "QRCODE_GENERATE",
+#    #     "data": resized_qr,
+#    # }
+#    # publish(MQTT_TOPIC, payload)
+#
+#     return {"status": "QR Code generated and sent"}
+
 DEFAULT_URL = "http://localhost:5173/lyrics"
 
 @router.post("/qrcode")
 async def generate_qrcode(data: QRCodeModel):
-    # Étape 1 : Récupération de l'URL
-    url = data.url if data.url else DEFAULT_URL
+    # 1) Génération QR PIL.Image
+    url = data.url or DEFAULT_URL
+    qr_img = create_qr_code(url)
 
-    # Étape 2 : Génération QR brut
-    qr_code_bin = create_qr_code(url)
-
-    # Étape 3 : Lecture de la config écran (fichier JSON temporaire)
+    # 2) Charger config écran
     if os.path.exists(SETTINGS_PATH):
-        with open(SETTINGS_PATH, "r") as f:
-            settings = json.load(f)
+        settings = json.load(open(SETTINGS_PATH))
     else:
-        settings = {
-            "screenCount": 1,
-            "matrixCount": 9,
-            "screenShape": "square"
-        }
+        settings = {"screenCount":1, "matrixCount":9, "screenShape":"square"}
 
-    screen_count = settings.get("screenCount", 1)
-    matrix_count = settings.get("matrixCount", 9)
-    screen_shape = settings.get("screenShape", "square")
+    # 3) Redimensionner vers une PIL.Image finale
+    resized_img = resize_qr_code(qr_img,
+                                  settings["screenCount"],
+                                  settings["matrixCount"],
+                                  settings["screenShape"])
 
-    # Étape 4 : Redimensionnement du QR code
-    resized_qr = resize_qr_code(qr_code_bin, screen_count, matrix_count, screen_shape)
+    # 4) Conversion en raw RGB888 base64
+    width, height, raw_b64 = qr_to_raw_base64(resized_img)
 
-    # Étape 5 : Envoi à l’ESP
+    # 5) Publication MQTT
     payload = {
-        "FLAG": "QRCODE_GENERATE",
-        "data": resized_qr,
+        "FLAG": "DISPLAY_RAW",
+        "width": width,
+        "height": height,
+        "data": raw_b64
     }
     publish(MQTT_TOPIC, payload)
 

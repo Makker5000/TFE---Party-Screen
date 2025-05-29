@@ -34,14 +34,14 @@
     console.log('Saving preset:', presetData);
     
     try {
-    //   const response = await fetch('http://localhost:8000/api/presets', {
-      const response = await fetch('/api/presets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(presetData)
-      });
+        // const response = await fetch('http://localhost:8000/api/presets', {
+        const response = await fetch('/api/presets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(presetData)
+        });
 
       if (!response.ok) {
         throw new Error('Erreur lors de l’enregistrement du preset');
