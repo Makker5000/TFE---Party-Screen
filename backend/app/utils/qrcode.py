@@ -82,15 +82,27 @@ import base64
 from typing import Tuple
 
 # Générer un QR PIL.Image
+# def create_qr_code(url: str) -> Image.Image:
+#     qr = qrcode.QRCode(
+#         version=1,
+#         error_correction=qrcode.constants.ERROR_CORRECT_L,
+#         box_size=10,
+#         border=1
+#     )
+#     qr.add_data(url)
+#     qr.make(fit=True)
+#     return qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
 def create_qr_code(url: str) -> Image.Image:
     qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
+        version=1,  # Force version 1
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Meilleure correction
+        box_size=1,  # On va redimensionner après
         border=1
     )
     qr.add_data(url)
-    qr.make(fit=True)
+    # qr.make(fit=False)  # Pas d'auto-fit
+    qr.make()
     return qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
 # Redimensionner pour produire une PIL.Image finale
@@ -98,15 +110,18 @@ def resize_qr_code(img: Image.Image,
                     screen_count: int,
                     matrix_count: int,
                     shape: str) -> Image.Image:
-    if shape == "horizontal":
-        width = matrix_count * screen_count * 8
-        height = matrix_count * 8
-    elif shape == "vertical":
-        width = matrix_count * 8
-        height = matrix_count * screen_count * 8
-    else:
-        width = matrix_count * 8
-        height = matrix_count * 8
+    # if shape == "horizontal":
+    #     width = matrix_count * screen_count * 8
+    #     height = matrix_count * 8
+    # elif shape == "vertical":
+    #     width = matrix_count * 8
+    #     height = matrix_count * screen_count * 8
+    # else:
+    #     width = matrix_count * 8
+    #     height = matrix_count * 8
+    width = 48
+    height = 48
+
     return img.resize((width, height), Image.NEAREST)
 
 # Convertir PIL.Image RGB en base64 RAW RGB888
