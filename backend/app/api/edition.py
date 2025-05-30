@@ -5,6 +5,7 @@ from app.utils.mqtt import publish
 from app.core.config import MQTT_TOPIC
 import shutil, os, uuid
 import json
+import io, base64
 
 from PIL import Image
 import json
@@ -224,6 +225,40 @@ async def upload_visual(file: UploadFile = File(...)):
 #    # publish(MQTT_TOPIC, payload)
 #
 #     return {"status": "QR Code generated and sent"}
+# --------------------- ///////////////////////////////////////////// -------------------
+# DEFAULT_URL = "http://localhost:5173/lyrics"
+
+# @router.post("/qrcode")
+# async def generate_qrcode(data: QRCodeModel):
+#     # 1) Génération QR PIL.Image
+#     url = data.url or DEFAULT_URL
+#     qr_img = create_qr_code(url)
+
+#     # 2) Charger config écran
+#     if os.path.exists(SETTINGS_PATH):
+#         settings = json.load(open(SETTINGS_PATH))
+#     else:
+#         settings = {"screenCount":1, "matrixCount":9, "screenShape":"square"}
+
+#     # 3) Redimensionner vers une PIL.Image finale
+#     resized_img = resize_qr_code(qr_img,
+#                                   settings["screenCount"],
+#                                   settings["matrixCount"],
+#                                   settings["screenShape"])
+
+#     # 4) Conversion en raw RGB888 base64
+#     width, height, raw_b64 = qr_to_raw_base64(resized_img)
+
+#     # 5) Publication MQTT
+#     payload = {
+#         "FLAG": "DISPLAY_RAW",
+#         "width": width,
+#         "height": height,
+#         "data": raw_b64
+#     }
+#     publish(MQTT_TOPIC, payload)
+
+#     return {"status": "QR Code generated and sent"}
 
 DEFAULT_URL = "http://localhost:5173/lyrics"
 
@@ -257,7 +292,18 @@ async def generate_qrcode(data: QRCodeModel):
     }
     publish(MQTT_TOPIC, payload)
 
-    return {"status": "QR Code generated and sent"}
+    # 6) NOUVEAU: Conversion pour le frontend (base64 standard)
+    # Convertir PIL Image en base64 PNG pour l'affichage web
+    buffer = io.BytesIO()
+    resized_img.save(buffer, format='PNG')
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return {
+        "status": "QR Code generated and sent",
+        "image": f"data:image/png;base64,{img_base64}",
+        "width": width,
+        "height": height
+    }
 
 
 ###############################################################

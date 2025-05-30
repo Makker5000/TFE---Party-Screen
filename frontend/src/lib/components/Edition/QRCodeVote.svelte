@@ -4,8 +4,12 @@
   let url = '';
   let defaultUrl = 'http://localhost:5173/lyrics';
 
-
   let currentUrl = url || defaultUrl;
+  
+  // NOUVEAU: Variables pour l'affichage de l'image
+  let qrImageSrc = '';
+  let qrGenerated = false;
+  let isLoading = false;
 
   export let data: {
     url: string;
@@ -22,7 +26,6 @@
   }
 
   async function handleSavePreset(presetName: string) {
-    // Ce sera l'objet qu'on enverra au backend plus tard
     const presetData = {
       type: 'qrcode',
       name: presetName,
@@ -44,7 +47,7 @@
         });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l’enregistrement du preset');
+        throw new Error('Erreur lors de l\'enregistrement du preset');
       }
 
       console.log('Preset QRCode enregistré avec succès');
@@ -61,12 +64,34 @@
       alert('Veuillez saisir une URL.');
       return;
     }
-    // await fetch('http://localhost:8000/api/edition/qrcode', {
-    await fetch('/api/edition/qrcode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: currentUrl })
-    });
+    
+    isLoading = true;
+    
+    try {
+    //   const response = await fetch('http://localhost:8000/api/edition/qrcode', {
+      const response = await fetch('/api/edition/qrcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la génération du QR Code');
+      }
+      
+      // NOUVEAU: Récupérer l'image du QR Code
+      const result = await response.json();
+      qrImageSrc = result.image;
+      qrGenerated = true;
+      
+      console.log('QR Code généré:', result);
+      
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('Erreur lors de la génération du QR Code');
+    } finally {
+      isLoading = false;
+    }
   }
 
   async function toggleQr() {
@@ -75,9 +100,7 @@
       return;
     }
     const endpoint = active
-      // ? 'http://localhost:8000/api/edition/stop'
       ? '/api/edition/qrcode/stop'
-      // ? 'http://localhost:8000/api/edition/play'
       : '/api/edition/qrcode/play';
     const payload = { url: active ? 'stop' : 'play' };
 
@@ -102,10 +125,34 @@
 
   {#if !editMode}
     <!-- Bouton Générer -->
-    <button on:click={generateQRCode} class="btn btn-primary btn-sm w-full max-w-xs">
+    <button 
+      on:click={generateQRCode} 
+      class="btn btn-primary btn-sm w-full max-w-xs"
+      disabled={isLoading}
+    >
+      {#if isLoading}
+        <span class="loading loading-spinner loading-sm"></span>
+        Génération...
+      {:else}
         Générer QR Code
+      {/if}
     </button>
 
+    <!-- NOUVEAU: Affichage du QR Code -->
+    {#if qrGenerated && qrImageSrc}
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body items-center text-center p-4">
+          <h3 class="card-title text-sm">QR Code généré</h3>
+          <img 
+            src={qrImageSrc} 
+            alt="QR Code" 
+            class="border-2 border-gray-300 rounded"
+            style="image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;"
+          />
+          <p class="text-xs text-gray-500 break-all">{currentUrl}</p>
+        </div>
+      </div>
+    {/if}
     
     <div class="flex space-x-2">
       <button
@@ -113,6 +160,7 @@
         class="btn btn-outline btn-sm btn-lg"
         class:btn-success={!active}
         class:btn-error={active}
+        disabled={!qrGenerated}
       >
         {active ? 'Stop' : 'Play'}
       </button>
