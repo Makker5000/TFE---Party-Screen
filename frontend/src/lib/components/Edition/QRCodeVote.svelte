@@ -68,7 +68,7 @@
     isLoading = true;
     
     try {
-    //   const response = await fetch('http://localhost:8000/api/edition/qrcode', {
+      // const response = await fetch('http://localhost:8000/api/edition/qrcode', {
       const response = await fetch('/api/edition/qrcode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

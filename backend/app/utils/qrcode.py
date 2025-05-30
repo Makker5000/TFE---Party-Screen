@@ -95,10 +95,10 @@ from typing import Tuple
 
 def create_qr_code(url: str) -> Image.Image:
     qr = qrcode.QRCode(
-        version=1,  # Force version 1
-        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Meilleure correction
-        box_size=1,  # On va redimensionner après
-        border=1
+        version=2,  # Version 1 = 21x21, Version 2 = 25x25, ...
+        error_correction=qrcode.constants.ERROR_CORRECT_L,  # Correction Minimale
+        box_size=1,     # 2 pixels par module = 50x50 pour version 2
+        border=1    # Bordure réduite à 2 modules
     )
     qr.add_data(url)
     # qr.make(fit=False)  # Pas d'auto-fit
