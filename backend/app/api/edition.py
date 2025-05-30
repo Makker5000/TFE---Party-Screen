@@ -285,7 +285,7 @@ async def generate_qrcode(data: QRCodeModel):
 
     # 5) Publication MQTT
     payload = {
-        "FLAG": "DISPLAY_RAW",
+        "FLAG": "DISPLAY_QR",
         "width": width,
         "height": height,
         "data": raw_b64,
