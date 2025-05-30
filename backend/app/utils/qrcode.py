@@ -98,12 +98,15 @@ def create_qr_code(url: str) -> Image.Image:
         version=2,  # Version 1 = 21x21, Version 2 = 25x25, ...
         error_correction=qrcode.constants.ERROR_CORRECT_L,  # Correction Minimale
         box_size=1,     # 2 pixels par module = 50x50 pour version 2
-        border=1    # Bordure réduite à 2 modules
+        border=0    # Pas de Bordure dans le QR Code
     )
     qr.add_data(url)
     # qr.make(fit=False)  # Pas d'auto-fit
     qr.make()
-    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+    # Générer l'image QR (21x21 pixels, noir et blanc)
+    qr_image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    return qr_image
 
 # Redimensionner pour produire une PIL.Image finale
 def resize_qr_code(img: Image.Image,
@@ -119,10 +122,22 @@ def resize_qr_code(img: Image.Image,
     # else:
     #     width = matrix_count * 8
     #     height = matrix_count * 8
-    width = 48
-    height = 48
+    width = 32
+    height = 32
+    target_size = (width, height)
 
-    return img.resize((width, height), Image.NEAREST)
+    # Créer une image 32x32 avec fond noir
+    final_img = Image.new('RGB', target_size, color=(0, 0, 0))
+
+    # Calculer la position pour centrer le QR Code 21x21 dans le 32x32
+    # (32-21)/2 = 5.5, donc on prend 5 pour avoir un léger décalage
+    offset_x = (32 - 21) // 2  # 5 pixels
+    offset_y = (32 - 21) // 2  # 5 pixels
+
+    # Coller le QR Code au centre
+    final_img.paste(img, (offset_x, offset_y))
+    
+    return final_img
 
 # Convertir PIL.Image RGB en base64 RAW RGB888
 def qr_to_raw_base64(img: Image.Image) -> Tuple[int, int, str]:

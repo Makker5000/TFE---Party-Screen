@@ -288,7 +288,8 @@ async def generate_qrcode(data: QRCodeModel):
         "FLAG": "DISPLAY_RAW",
         "width": width,
         "height": height,
-        "data": raw_b64
+        "data": raw_b64,
+        "qr_content": url,
     }
     publish(MQTT_TOPIC, payload)
 
