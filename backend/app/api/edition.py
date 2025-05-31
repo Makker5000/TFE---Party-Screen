@@ -14,6 +14,7 @@ import requests
 from dotenv import load_dotenv
 import asyncio
 import re
+from typing import Union
 
 from PIL import Image
 import json
@@ -323,7 +324,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 AUDIO_PATH = UPLOAD_DIR / "test.wav"
 
-playing_lyrics: asyncio.Task | None = None
+playing_lyrics: Union[asyncio.Task, None] = None
 
 async def record_and_get_path(durée: int = 15) -> Path:
     # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
