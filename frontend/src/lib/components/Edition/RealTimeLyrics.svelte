@@ -68,8 +68,9 @@
     if (!active) {
       // const config = { textColor, backgroundColor, font, animation };
       const config = { ...data, state: active ? 'stop' : 'play' };
-      // await fetch('http://localhost:8000/api/edition/lyrics/play', {
-      await fetch('/api/edition/lyrics/play', {
+      // const config = { ...data };
+      // fetch('http://localhost:8000/api/edition/lyrics/play', {
+      fetch('/api/edition/lyrics/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -130,22 +131,6 @@
   </div>
 
   <!-- Boutons Toggle et Save -->
-  <!-- <div class="flex space-x-2">
-    <button
-      on:click={toggleLyrics}
-      class="btn btn-outline btn-sm btn-lg"
-      class:btn-success={!active}
-      class:btn-error={active}
-    >
-      {active ? 'Stop' : 'Play'}
-    </button>
-    <button 
-      class="btn btn-outline btn-sm btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
-      on:click={openSavePresetModal}
-    >
-      Save
-    </button>
-  </div> -->
   {#if !editMode}
     <div class="flex space-x-2">
       <button

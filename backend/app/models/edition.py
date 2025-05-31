@@ -24,3 +24,7 @@ class AdsModel(BaseModel):
     speed: int
     content: str
     state: str
+
+# class SongRequest(BaseModel):
+#     title: str
+#     artist: str

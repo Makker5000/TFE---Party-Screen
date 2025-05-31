@@ -1,11 +1,19 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel
+from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel #, SongRequest
 from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
 from app.core.config import MQTT_TOPIC
 import shutil, os, uuid
 import json
 import io, base64
+import subprocess
+from pathlib import Path
+import sounddevice as sd
+from scipy.io.wavfile import write
+import requests
+from dotenv import load_dotenv
+import asyncio
+import re
 
 from PIL import Image
 import json
@@ -310,17 +318,167 @@ async def generate_qrcode(data: QRCodeModel):
 ###############################################################
 
 # --------------- LYRICS ---------------- ############### (A IMPLEMENTER !!!) #####################
+UPLOAD_DIR = Path("./app/uploads/lyrics")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+AUDIO_PATH = UPLOAD_DIR / "test.wav"
+
+playing_lyrics: asyncio.Task | None = None
+
+async def record_and_get_path(durée: int = 15) -> Path:
+    # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
+    # cmd = [
+    #     "arecord",
+    #     "-D", "plughw:1,0",        # adapte à ton device
+    #     "-f", "cd",
+    #     "-t", "wav",
+    #     "-d", str(durée),
+    #     str(AUDIO_PATH)
+    # ]
+    # subprocess.run(cmd, check=True)
+    # return AUDIO_PATH
+
+    sample_rate = 44100  # Qualité CD
+    print(f"📢 Enregistrement audio de {durée} secondes...")
+    audio = sd.rec(int(durée * sample_rate), samplerate=sample_rate, channels=2)
+    sd.wait()  # Attend la fin de l'enregistrement
+    write(str(AUDIO_PATH), sample_rate, audio)
+    return AUDIO_PATH
+
+
+def recognize_music_with_audd(file_path: str) -> dict:
+    """
+    Envoie un fichier audio à l'API AudD pour reconnaissance musicale.
+    
+    Args:
+        file_path (str): Chemin vers le fichier audio.
+        api_token (str): Clé API AudD.
+
+    Returns:
+        dict: Dictionnaire contenant l'artiste, le titre, ou une erreur.
+    """
+    url = "https://api.audd.io/"
+
+    load_dotenv()  # lit ton .env
+
+    api_token = os.getenv("AUDD_TOKEN")
+
+    with open(file_path, 'rb') as audio_file:
+        files = {
+            'file': audio_file,
+        }
+        data = {
+            'api_token': api_token,
+            'return': 'apple_music,spotify',  # tu peux enlever si tu veux moins de données
+        }
+
+        response = requests.post(url, data=data, files=files)
+    
+    if response.status_code == 200:
+        result = response.json()
+        if result.get("status") == "success" and result.get("result"):
+            title = result["result"].get("title")
+            artist = result["result"].get("artist")
+            return {"title": title, "artist": artist}
+        else:
+            return {"error": "Musique non reconnue."}
+    else:
+        return {"error": f"Erreur API: {response.status_code} - {response.text}"}
+    
+
+def get_lyrics(data: dict):
+    title = data.get("title")
+    artist = data.get("artist")
+
+    if not title or not artist:
+        raise HTTPException(status_code=400, detail="Title and artist are required")
+
+    base_url = "https://api.lyrics.ovh/v1"
+    url = f"{base_url}/{artist}/{title}"
+
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        lyrics_data = response.json()
+        return {"lyrics": lyrics_data.get("lyrics", "No lyrics found.")}
+    else:
+        raise HTTPException(status_code=404, detail="Lyrics not found.")
+    
+
+async def play_lyrics_blocks(lyrics_data: dict, topic: str):
+    lyrics = lyrics_data.get("lyrics", "")
+    
+    # Découpage des paroles en phrases (chaque ligne non vide ou bloc de texte)
+    blocks = [line.strip() for line in re.split(r'\r?\n+', lyrics) if line.strip()]
+    
+
+    for i, block in enumerate(blocks, 1):
+        payload = {
+            "FLAG": "LYRICS_BLOCK",
+            "index": i,
+            "text": block
+        }
+        publish(topic, payload)
+        print(f"Bloc {i} envoyé : {block}")
+        await asyncio.sleep(3)
+
+    # Message de fin
+    publish(topic, {"FLAG": "LYRICS_STOP"})
+    print("🎉 Tous les lyrics ont été envoyés !")
+
+
 @router.post("/lyrics/play")
 async def play_lyrics(data: LyricsModel):
+    global playing_lyrics
+
+    # Stoppe la tâche précédente si elle existe
+    if playing_lyrics is not None and not playing_lyrics.done():
+        playing_lyrics.cancel()
+        try:
+            await playing_lyrics
+        except asyncio.CancelledError:
+            print("Ancienne tâche annulée")
+
     payload = { "FLAG": "LYRICS_PLAY", **data.dict() }
     publish(MQTT_TOPIC, payload)
+
+    # Enregistrement Audio de 5sec pour l'envoyer à API Reconnaissance Musicale
+    # audio_file = await record_and_get_path(durée=10)
+    # if audio_file != 0:
+    #     print("Fichier Audio créer et enregistré !")
+
+    # Envoyer le Son à l'API AudD et récupérer Titre + Artiste
+    # meta_data = recognize_music_with_audd(audio_file)
+    # print(f"Titre et Artiste reconnu par AudD : {meta_data}")
+
+    # chanson1 = {'title': "La vie qu'on mène", 'artist': 'Ninho'}
+
+    # Récupération des Paroles de la chanson détectée
+    # lyrics_data = get_lyrics(meta_data)
+    lyrics_data = {'lyrics': "No me importa lo que de mí se diga\r\nVida usted su vida, que yo vivo la mia\r\nQue solo es una, disfruta el momento\r\nQue el tiempo se acaba y pa'trás no vira\r\nBebiendo, fumando y jodiendo\n\nSigo vacilando de party to' los día'\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (¡Farru!)\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (La rola y pepa)\n\n\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\n\n\nDesacata'o\n\nEmpastilla'o\n\n(Qué maldita nota)\n\n(Arcoíris)\n\n¡Fa-Farru!\n\n\n\n"}
+    print(f"Les Lyrics du son capté : {lyrics_data}")
+
+    # Découpage et envoie des Paroles par blocs via MQTT
+    playing_lyrics = asyncio.create_task(play_lyrics_blocks(lyrics_data, MQTT_TOPIC))
+
     return {"status": "ok"}
 
 @router.post("/lyrics/stop")
 async def stop_lyrics():
+    global playing_lyrics
+
+    if playing_lyrics is not None and not playing_lyrics.done():
+        playing_lyrics.cancel()
+        try:
+            await playing_lyrics
+        except asyncio.CancelledError:
+            print("Tâche lyrics annulée")
+
     publish(MQTT_TOPIC, { "FLAG": "LYRICS_STOP" })
     return {"status": "ok"}
 
+
+# ############################################# FIN Lyrics ##################################################
 # --------------- ADS ----------------
 @router.post("/ads/play")
 async def play_ads(data: AdsModel):
