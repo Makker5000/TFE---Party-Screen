@@ -10,7 +10,7 @@ fastapi==0.115.11
 greenlet==3.2.2
 h11==0.14.0
 idna==3.10
-numpy==2.2.4
+numpy==2.0.2
 paho-mqtt==2.1.0
 pillow==11.2.1
 pyarrow==19.0.1
