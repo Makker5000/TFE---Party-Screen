@@ -86,7 +86,7 @@ def create_qr_code(url: str) -> Image.Image:
     qr = qrcode.QRCode(
         version=1,  # Version 1 = 21x21, Version 2 = 25x25, ...
         error_correction=qrcode.constants.ERROR_CORRECT_L,  # Correction Minimale
-        box_size=1,     # 2 pixels par module = 50x50 pour version 2
+        box_size=2,     # 2 pixels par module = 50x50 pour version 2
         border=0    # Pas de Bordure dans le QR Code
     )
     qr.add_data(url)
@@ -107,7 +107,7 @@ def resize_qr_code(img: Image.Image,
     target_size = (width, height)
 
     # Créer une image 32x32 avec fond noir
-    final_img = Image.new('RGB', target_size, color=(0, 0, 0))
+    final_img = Image.new('RGB', target_size, color=(255, 255, 255))
 
     img_width, img_height = img.size
 
