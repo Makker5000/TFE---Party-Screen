@@ -217,7 +217,7 @@ async def play_visual(req: ArtistVisualModel):
         "picture": b64_data
     }
 
-    publish(MQTT_TOPIC, json.dumps(payload))
+    publish(MQTT_TOPIC, payload)
 
     return {"status": "Play command envoyé", "filename": unique_filename}
 
@@ -231,7 +231,7 @@ async def stop_visual():
         "FLAG": "VISUAL_STOP"
     }
 
-    publish(MQTT_TOPIC, str(payload))
+    publish(MQTT_TOPIC, payload)
 
     return {"status": "Stop command envoyé"}
 
