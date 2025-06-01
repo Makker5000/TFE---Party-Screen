@@ -63,10 +63,10 @@ async def get_brightness():
 #     return {"status": "ok", "sent": payload}
 
 ################### Fonctionne mais pas Complet ! ############################
-# UPLOAD_DIR = "app/uploads/visuals"
+# UPLOAD_DIR_VISUAL = "app/uploads/visuals"
 
 # # S'assurer que le dossier existe
-# os.makedirs(UPLOAD_DIR, exist_ok=True)
+# os.makedirs(UPLOAD_DIR_VISUAL, exist_ok=True)
 
 # @router.post("/visual/upload")
 # async def upload_visual(file: UploadFile = File(...)):
@@ -78,7 +78,7 @@ async def get_brightness():
 #     # Générer un nom unique
 #     ext = os.path.splitext(file.filename)[1]
 #     unique_filename = f"{uuid.uuid4()}{ext}"
-#     file_path = os.path.join(UPLOAD_DIR, unique_filename)
+#     file_path = os.path.join(UPLOAD_DIR_VISUAL, unique_filename)
 
 #     # Sauvegarder le fichier
 #     with open(file_path, "wb") as buffer:
@@ -102,7 +102,7 @@ async def get_brightness():
 ######################## Fonctionnel avec redimensionnement d'image ! ################################
 
 SETTINGS_PATH = "app/data/settings.json"
-UPLOAD_DIR = "app/uploads/visuals"
+UPLOAD_DIR_VISUAL = "app/uploads/visuals"
 
 def load_settings():
     if os.path.exists(SETTINGS_PATH):
@@ -140,30 +140,98 @@ async def upload_visual(file: UploadFile = File(...)):
     # Nom unique
     ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    file_path = os.path.join(UPLOAD_DIR_VISUAL, unique_filename)
 
     # 🔧 Redimensionner image si besoin
     if file.content_type.startswith("image"):
-        img = Image.open(file.file)
+        img = Image.open(file.file).convert("RGB")
         resized_img = img.resize((width, height))
-        resized_img.save(file_path)
+        resized_img.save(file_path, format="PNG")
+
+        # 3) Convertir en RAW565
+        pixels = resized_img.load()
+        raw565 = bytearray()
+        for y in range(height):
+            for x in range(width):
+                r, g, b = pixels[x, y]
+                # convertir 8 bits → 5/6/5
+                r5 = (r >> 3) & 0x1F
+                g6 = (g >> 2) & 0x3F
+                b5 = (b >> 3) & 0x1F
+                rgb565 = (r5 << 11) | (g6 << 5) | b5
+                # stocker en big endian (MSB puis LSB)
+                raw565.append((rgb565 >> 8) & 0xFF)
+                raw565.append(rgb565 & 0xFF)
+
+        # 4) Encoder ce raw565 en Base64
+        b64_data = base64.b64encode(bytes(raw565)).decode("utf-8")
+
+        # 5) Sauvegarder la chaîne Base64 dans un fichier .b64 (même basename + ".b64")
+        b64_filename = unique_filename + ".b64"
+        b64_path = os.path.join(UPLOAD_DIR_VISUAL, b64_filename)
+        with open(b64_path, "w") as f_b64:
+            f_b64.write(b64_data)
+
     else:
         # Vidéos, gif → sauvegarde brut
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-
-    file_url = f"http://localhost:8000/static/visuals/{unique_filename}"
-    payload = {
-        "FLAG": "ARTIST_VISUAL",
-        "file_url": file_url
-    }
-    publish(MQTT_TOPIC, str(payload))
+        # On met b64_data à None pour signaler qu’il n’y a pas de RAW565
+        b64_data = None
+        b64_filename = None
 
     return {
-        "status": "Fichier uploadé et adapté à l'écran",
-        "resolution": f"{width}x{height}",
-        "file_url": file_url
+        "status": "Upload réussi",
+        "filename": unique_filename,   # Renvoie au front pour la suite “Play”
+        "width": width,
+        "height": height,
+        "has_raw565": b64_data is not None
     }
+    
+
+@router.post("/visual/play")
+async def play_visual(req: ArtistVisualModel):
+    """
+    - Lit le fichier Base64 précédemment généré lors de l’upload (<filename>.b64).
+    - Construit le payload MQTT : { "FLAG": "VISUAL_PLAY", "picture": "<base64_RAW565>" }.
+    - Envoie tout ça sur le topic configuré.
+    """
+    unique_filename = req.media
+    b64_filename    = unique_filename + ".b64"
+    b64_path        = os.path.join(UPLOAD_DIR_VISUAL, b64_filename)
+
+    # Vérifier que le fichier .b64 existe
+    if not os.path.exists(b64_path):
+        raise HTTPException(status_code=404, detail=f"Le fichier Base64 pour '{unique_filename}' n'existe pas.")
+
+    # Charger la chaîne Base64
+    with open(b64_path, "r") as f:
+        b64_data = f.read().strip()
+
+    # Construire le payload MQTT
+    payload = {
+        "FLAG": "VISUAL_PLAY",
+        "picture": b64_data
+    }
+
+    publish(MQTT_TOPIC, str(payload))
+
+    return {"status": "Play command envoyé", "filename": unique_filename}
+
+
+@router.post("/visual/stop")
+async def stop_visual():
+    """
+    - Envoie simplement { "FLAG": "VISUAL_STOP" } sur le broker MQTT.
+    """
+    payload = {
+        "FLAG": "VISUAL_STOP"
+    }
+
+    publish(MQTT_TOPIC, str(payload))
+
+    return {"status": "Stop command envoyé"}
+
 
 ########################################################
 
@@ -319,10 +387,10 @@ async def generate_qrcode(data: QRCodeModel):
 ###############################################################
 
 # --------------- LYRICS ---------------- ############### (A IMPLEMENTER !!!) #####################
-UPLOAD_DIR = Path("./app/uploads/lyrics")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
+UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
 
-AUDIO_PATH = UPLOAD_DIR / "test.wav"
+AUDIO_PATH = UPLOAD_DIR_LYRICS / "test.wav"
 
 playing_lyrics: Union[asyncio.Task, None] = None
 
