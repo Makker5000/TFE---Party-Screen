@@ -95,7 +95,7 @@ from typing import Tuple
 
 def create_qr_code(url: str) -> Image.Image:
     qr = qrcode.QRCode(
-        version=2,  # Version 1 = 21x21, Version 2 = 25x25, ...
+        version=1,  # Version 1 = 21x21, Version 2 = 25x25, ...
         error_correction=qrcode.constants.ERROR_CORRECT_L,  # Correction Minimale
         box_size=1,     # 2 pixels par module = 50x50 pour version 2
         border=0    # Pas de Bordure dans le QR Code
@@ -122,8 +122,8 @@ def resize_qr_code(img: Image.Image,
     # else:
     #     width = matrix_count * 8
     #     height = matrix_count * 8
-    width = 32
-    height = 32
+    width = 48
+    height = 48
     target_size = (width, height)
 
     # Créer une image 32x32 avec fond noir
@@ -131,8 +131,8 @@ def resize_qr_code(img: Image.Image,
 
     # Calculer la position pour centrer le QR Code 21x21 dans le 32x32
     # (32-21)/2 = 5.5, donc on prend 5 pour avoir un léger décalage
-    offset_x = (32 - 21) // 2  # 5 pixels
-    offset_y = (32 - 21) // 2  # 5 pixels
+    offset_x = (width - 21) // 2  # 5 pixels
+    offset_y = (height - 21) // 2  # 5 pixels
 
     # Coller le QR Code au centre
     final_img.paste(img, (offset_x, offset_y))
