@@ -136,6 +136,9 @@ async def upload_visual(file: UploadFile = File(...)):
     allowed_types = ["image/jpeg", "image/png", "image/gif", "video/mp4"]
     if file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Type de fichier non supporté")
+    
+    # Créer dossier d’upload s’il n’existe pas
+    os.makedirs(UPLOAD_DIR_VISUAL, exist_ok=True)
 
     # Nom unique
     ext = os.path.splitext(file.filename)[1]
