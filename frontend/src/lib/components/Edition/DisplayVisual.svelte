@@ -60,8 +60,8 @@
 
       let uploadResponse;
       try {
-        // uploadResponse = await fetch('http://localhost:8000/api/edition/visual/upload', {
-        uploadResponse = await fetch('/api/edition/visual/upload', {
+        uploadResponse = await fetch('http://localhost:8000/api/edition/visual/upload', {
+        // uploadResponse = await fetch('/api/edition/visual/upload', {
           method: 'POST',
           body: formData
         });
@@ -82,8 +82,8 @@
 
       // === 2) Dès que l’upload est fait, on envoie le “play” ===
       try {
-        // const playResponse = await fetch('http://localhost:8000/api/edition/visual/play', {
-        const playResponse = await fetch('/api/edition/visual/play', {
+        const playResponse = await fetch('http://localhost:8000/api/edition/visual/play', {
+        // const playResponse = await fetch('/api/edition/visual/play', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ media: uploadedFilename })
@@ -106,8 +106,8 @@
     } else {
       // === 3) On était actif, on envoie donc le “stop” ===
       try {
-        // const stopResponse = await fetch('http://localhost:8000/api/edition/visual/stop', {
-        const stopResponse = await fetch('/api/edition/visual/stop', {
+        const stopResponse = await fetch('http://localhost:8000/api/edition/visual/stop', {
+        // const stopResponse = await fetch('/api/edition/visual/stop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });

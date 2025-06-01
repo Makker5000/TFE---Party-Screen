@@ -217,7 +217,7 @@ async def play_visual(req: ArtistVisualModel):
         "picture": b64_data
     }
 
-    publish(MQTT_TOPIC, str(payload))
+    publish(MQTT_TOPIC, json.dumps(payload))
 
     return {"status": "Play command envoyé", "filename": unique_filename}
 
