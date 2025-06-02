@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import asyncio
 import re
 from typing import Union
+import math
 
 from PIL import Image
 import json
@@ -111,7 +112,7 @@ def load_settings():
     return {
         "screenCount": 1,
         "matrixCount": 4,
-        "screenShape": "square"
+        "screenShape": "Square"
     }
 
 @router.post("/visual/upload")
@@ -126,9 +127,22 @@ async def upload_visual(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Configuration invalide : minimum 4 matrices et 1 écran requis.")
 
     # ✅ Déduire résolution globale
-    if shape == "square":
-        width = height = int((matrix_count * 16) ** 0.5)
-    else:  # suppose un écran horizontal
+    if shape == "Square":
+        # On s'assure que matrix_count est un carré parfait avant de faire la racine
+        side_matrices = int(math.isqrt(matrix_count))
+        if side_matrices * side_matrices != matrix_count:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pour shape='square', matrixCount={matrix_count} doit être un carré parfait "
+                       f"(ex : 4, 9, 16, ...)."
+            )
+        # Exemple pour 4 matrices : sqrt(4)=2 → 2*16 = 32 × 32
+        width = side_matrices * 16
+        height = side_matrices * 16
+    else:
+        # Pour un écran « horizontal » (ou « vertical ») classique
+        # largeur = nombre total de matrices horizontales × 16
+        # hauteur = 16 pixels × nombre d'écrans verticaux
         width = matrix_count * 16
         height = 16 * screen_count
 
@@ -153,21 +167,17 @@ async def upload_visual(file: UploadFile = File(...)):
 
         # 3) Convertir en RAW565
         pixels = resized_img.load()
-        raw565 = bytearray()
+        raw888 = bytearray()
         for y in range(height):
             for x in range(width):
                 r, g, b = pixels[x, y]
-                # convertir 8 bits → 5/6/5
-                r5 = (r >> 3) & 0x1F
-                g6 = (g >> 2) & 0x3F
-                b5 = (b >> 3) & 0x1F
-                rgb565 = (r5 << 11) | (g6 << 5) | b5
-                # stocker en big endian (MSB puis LSB)
-                raw565.append((rgb565 >> 8) & 0xFF)
-                raw565.append(rgb565 & 0xFF)
+                # On prend directement les valeurs 8 bits pour chaque canal
+                raw888.append(r)
+                raw888.append(g)
+                raw888.append(b)
 
-        # 4) Encoder ce raw565 en Base64
-        b64_data = base64.b64encode(bytes(raw565)).decode("utf-8")
+        # 4) Encoder ce raw888 en Base64
+        b64_data = base64.b64encode(bytes(raw888)).decode("utf-8")
 
         # 5) Sauvegarder la chaîne Base64 dans un fichier .b64 (même basename + ".b64")
         b64_filename = unique_filename + ".b64"
@@ -188,7 +198,7 @@ async def upload_visual(file: UploadFile = File(...)):
         "filename": unique_filename,   # Renvoie au front pour la suite “Play”
         "width": width,
         "height": height,
-        "has_raw565": b64_data is not None
+        "has_raw888": b64_data is not None
     }
     
 

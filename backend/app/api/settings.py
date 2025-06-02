@@ -73,5 +73,5 @@ async def get_current_settings():
     return {
         "screenCount": 1,
         "matrixCount": 4,
-        "screenShape": "square"
+        "screenShape": "Square"
     }
