@@ -17,7 +17,7 @@
     <!-- Brightness Component -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Brightness</h2>
+        <h2 class="card-title justify-center">Brightness</h2>
         <Brightness class="w-full" />
       </div>
     </div>
@@ -25,7 +25,7 @@
     <!-- Display Visual Component -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Display Visual</h2>
+        <h2 class="card-title justify-center">Display Visual</h2>
         <DisplayVisual class="w-full" />
       </div>
     </div>
@@ -33,7 +33,7 @@
     <!-- QR Code Vote Component -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">QR Code Vote</h2>
+        <h2 class="card-title justify-center">QR Code Vote</h2>
         <QRCodeVote class="w-full" />
       </div>
     </div>
@@ -41,7 +41,7 @@
     <!-- Real-Time Lyrics Component -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Real-Time Lyrics</h2>
+        <h2 class="card-title justify-center">Real-Time Lyrics</h2>
         <RealTimeLyrics class="w-full" />
       </div>
     </div>
@@ -49,7 +49,7 @@
     <!-- Displaying Ads Component -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Displaying Ads</h2>
+        <h2 class="card-title justify-center">Displaying Ads</h2>
         <DisplayingAds class="w-full" />
       </div>
     </div>

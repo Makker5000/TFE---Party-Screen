@@ -181,7 +181,7 @@
     <!-- Modifier Username -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Change Username</h2>
+        <h2 class="card-title justify-center">Change Username</h2>
         <input
           type="text"
           placeholder="New Username"
@@ -195,7 +195,7 @@
     <!-- Modifier Password -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Change Password</h2>
+        <h2 class="card-title justify-center">Change Password</h2>
         <input
           type="password"
           placeholder="Old Password"
@@ -215,7 +215,7 @@
     <!-- Créer un compte -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body">
-        <h2 class="card-title">Create New Account</h2>
+        <h2 class="card-title justify-center">Create New Account</h2>
         <input
           type="text"
           placeholder="Username"

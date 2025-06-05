@@ -28,7 +28,7 @@
     <div class="flex justify-end space-x-2 mt-4">
       <!-- Play/Stop Toggle -->
       <button
-        class="btn btn-square btn-outline btn-sm"
+        class="btn btn-square btn-outline btn-sm w-16 h-10"
         class:btn-success={!active}
         class:btn-error={active}
         on:click={togglePlay}
@@ -36,11 +36,11 @@
         {active ? '⏹️' : '▶️'}
       </button>
       <!-- Modify -->
-      <button class="btn btn-outline btn-sm" on:click={modifyPreset}>
+      <button class="btn btn-outline btn-sm w-16 h-10" on:click={modifyPreset}>
         ✏️
       </button>
       <!-- Delete -->
-      <button class="btn btn-outline btn-sm btn-error" on:click={deletePreset}>
+      <button class="btn btn-outline btn-sm w-16 h-10 btn-error" on:click={deletePreset}>
         🗑️
       </button>
     </div>

@@ -89,7 +89,7 @@
   <!-- Text Color -->
   <div class="flex flex-col items-start w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
-    <label class="label"><span class="label-text text-white">Text Color</span></label>
+    <label class="label"><span class="label-text">Text Color</span></label>
     <select bind:value={data.textColor} class="select select-bordered w-full">
       {#each availableTextColors as color}
         <option value={color}>{color}</option>
@@ -100,7 +100,7 @@
   <!-- Background Color -->
   <div class="flex flex-col items-start w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
-    <label class="label"><span class="label-text text-white">Background Color</span></label>
+    <label class="label"><span class="label-text">Background Color</span></label>
     <select bind:value={data.backgroundColor} class="select select-bordered w-full">
       {#each availableBgColors as color}
         <option value={color}>{color}</option>
@@ -111,7 +111,7 @@
   <!-- Font -->
   <div class="flex flex-col items-start w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
-    <label class="label"><span class="label-text text-white">Font</span></label>
+    <label class="label"><span class="label-text">Font</span></label>
     <select bind:value={data.font} class="select select-bordered w-full">
       {#each availableFonts as f}
         <option value={f}>{f}</option>
@@ -122,7 +122,7 @@
   <!-- Animation -->
   <div class="flex flex-col items-start w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
-    <label class="label"><span class="label-text text-white">Animation</span></label>
+    <label class="label"><span class="label-text">Animation</span></label>
     <select bind:value={data.animation} class="select select-bordered w-full">
       {#each availableAnimations as a}
         <option value={a}>{a}</option>

@@ -84,7 +84,7 @@
     <!-- Matrix Count Card -->
     <div class="card bg-base-100 shadow-md mx-auto">
       <div class="card-body items-center">
-        <h2 class="card-title">Number of Matrices</h2>
+        <h2 class="card-title">Number of Matrix</h2>
         <input
           type="number"
           min="0"

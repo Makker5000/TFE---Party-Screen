@@ -27,8 +27,8 @@
 
   async function loadPresets() {
     try {
-      // const res = await fetch('http://localhost:8000/api/presets');
-      const res = await fetch('/api/presets');
+      const res = await fetch('http://localhost:8000/api/presets');
+      // const res = await fetch('/api/presets');
       if (!res.ok) throw new Error('Failed to load presets');
       presets = await res.json();
     } catch (error) {
@@ -90,8 +90,8 @@
     const preset = presets.find(p => p.id === event.detail.id);
     if (!preset) return;
     if (!confirm(`Supprimer le preset « ${preset.name} » ?`)) return;
-    await fetch(`http://localhost:8000/api/presets/${preset.id}`, { method: 'DELETE' });
-    // await fetch(`/api/presets/${preset.id}`, { method: 'DELETE' });
+    // await fetch(`http://localhost:8000/api/presets/${preset.id}`, { method: 'DELETE' });
+    await fetch(`/api/presets/${preset.id}`, { method: 'DELETE' });
     await loadPresets();
   }
 

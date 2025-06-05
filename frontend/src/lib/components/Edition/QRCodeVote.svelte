@@ -102,6 +102,9 @@
     const endpoint = active
       ? '/api/edition/qrcode/stop'
       : '/api/edition/qrcode/play';
+    // const endpoint = active
+    //   ? 'http://localhost:8000/api/edition/qrcode/stop'
+    //   : 'http://localhost:8000/api/edition/qrcode/play';
     const payload = { url: active ? 'stop' : 'play' };
 
     await fetch(endpoint, {

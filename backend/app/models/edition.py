@@ -10,6 +10,9 @@ class ArtistVisualModel(BaseModel):
 class QRCodeModel(BaseModel):
     url: str
 
+class QRCodePlayModel(BaseModel):
+    filename: str
+
 class LyricsModel(BaseModel):
     textColor: str
     backgroundColor: str
