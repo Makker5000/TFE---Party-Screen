@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { writable } from 'svelte/store';
   import { onMount } from 'svelte';
 
@@ -9,17 +9,44 @@
 
   export const screenShapes = ["Square", "Line", "Horizontal Rectangle", "Vertical Rectangle"];
 
+  let token: string;
+
   // Au montage, on récupère l'état courant côté backend
   onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+
     try {
-      // const res = await fetch('http://localhost:8000/api/settings/power', { method: 'GET' });
-      const res = await fetch('/api/settings/power', { method: 'GET' });
+      // const res = await fetch('http://localhost:8000/api/settings/power', { 
+      const res = await fetch('/api/settings/power', { 
+        method: 'GET',
+        headers: {
+                'Authorization': `Bearer ${token}`
+            },
+      });
+      // const res = await fetch('/api/settings/power', { method: 'GET' });
       const json = await res.json();
       power = json.power;
       console.log("L'état de Power : ", json.power);
     } catch (e) {
       console.error("Impossible de charger l'état allumé :", e);
       power = false; // fallback
+    }
+
+    try {
+      // const resCfg = await fetch('http://localhost:8000/api/settings/config', {
+      const resCfg = await fetch('/api/settings/config', {
+        method: 'GET',
+        headers: {
+                'Authorization': `Bearer ${token}`
+            },
+      });
+      // const resCfg = await fetch('/api/settings/config', { method: 'GET' });
+      const jsonCfg = await resCfg.json();
+      screenCount = jsonCfg.screenCount;
+      matrixCount = jsonCfg.matrixCount;
+      screenShape = jsonCfg.screenShape;
+    } catch (e) {
+      console.error("Impossible de charger la configuration :", e);
     }
   });
 
@@ -28,7 +55,10 @@
     // await fetch('http://localhost:8000/api/settings/power', {
     await fetch('/api/settings/power', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+       },
       body: JSON.stringify({ power })
     });
   }
@@ -38,7 +68,10 @@
     // await fetch('http://localhost:8000/api/settings/config', {
     await fetch('/api/settings/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+       },
       body: JSON.stringify(payload)
     });
   }

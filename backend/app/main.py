@@ -22,6 +22,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+# from app.models.settings import Base as SettingsBase
+# from app.core.config import engine
+
 
 from app.api.settings import router as settings_router
 from app.api.edition import router as edition_router
@@ -43,6 +46,9 @@ app.include_router(settings_router, prefix="/api/settings")
 app.include_router(edition_router, prefix="/api/edition")
 app.include_router(presets_router, prefix="/api/presets")
 app.include_router(users_router, prefix="/api/users")
+
+# Créer la table si elle n'existe pas
+# SettingsBase.metadata.create_all(bind=engine)
 
 app.mount("/static", StaticFiles(directory="app/uploads"), name="static")
 
