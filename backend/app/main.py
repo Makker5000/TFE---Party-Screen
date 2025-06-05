@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.settings import router as settings_router
 from app.api.edition import router as edition_router
 from app.api.presets import router as presets_router
+from app.api.users import router as users_router
 
 app = FastAPI()
 
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(settings_router, prefix="/api/settings")
 app.include_router(edition_router, prefix="/api/edition")
 app.include_router(presets_router, prefix="/api/presets")
+app.include_router(users_router, prefix="/api/users")
 
 app.mount("/static", StaticFiles(directory="app/uploads"), name="static")
 
