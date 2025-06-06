@@ -3,6 +3,7 @@ from typing import Optional
 from app.db import Base
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
+from typing import Optional
 
 class BrightnessModel(BaseModel):
     brightness: int
@@ -30,9 +31,9 @@ class QRCodeModel(BaseModel):
     url: str
 
 class QRCodePlayModel(BaseModel):
-    url: str
-    id: int
-    state: str
+    url: Optional[str] = None
+    id: Optional[int] = None
+    state: Optional[str] = None
 
     class Config:
         extra = "ignore"
