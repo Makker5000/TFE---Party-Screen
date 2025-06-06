@@ -48,7 +48,7 @@ import { page } from '$app/stores';</script>
 	{/if}
 
 	<!-- Page content centered horizontally -->
-	<main class="w-full max-w-4xl mt-6">
+	<main class="w-full max-w-4xl mt-6 pb-16 sm:pb-0">
 		<slot></slot>
 	</main>
 </div>
