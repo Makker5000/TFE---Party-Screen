@@ -1,5 +1,7 @@
 <script lang="ts">
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
+  import { onMount } from 'svelte';
+
 
   let textColor = 'white';
   let backgroundColor = 'none';
@@ -26,6 +28,12 @@
   let active = false;
   let showModal = false;
 
+  let token: string;
+
+  onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+  });
+
   function openSavePresetModal() {
     showModal = true;
   }
@@ -47,7 +55,8 @@
       const response = await fetch('/api/presets', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(presetData)
       });
@@ -72,7 +81,10 @@
       // fetch('http://localhost:8000/api/edition/lyrics/play', {
       fetch('/api/edition/lyrics/play', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(config)
       });
       console.log('Play Real-time Lyrics:', config);
