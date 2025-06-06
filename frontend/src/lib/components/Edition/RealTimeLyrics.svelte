@@ -78,8 +78,8 @@
       // const config = { textColor, backgroundColor, font, animation };
       const config = { ...data, state: active ? 'stop' : 'play' };
       // const config = { ...data };
-      // fetch('http://localhost:8000/api/edition/lyrics/play', {
-      fetch('/api/edition/lyrics/play', {
+      // await fetch('http://localhost:8000/api/edition/lyrics/play', {
+      await fetch('/api/edition/lyrics/play', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
