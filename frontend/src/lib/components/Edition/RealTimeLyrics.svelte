@@ -16,12 +16,14 @@
     textColor: string;
     backgroundColor: string;
     font: string;
-    animation: string;   
+    animation: string;
+    state: 'play' | 'stop';  
   } = {
     textColor: textColor,
     backgroundColor: backgroundColor,
     font: font,
     animation: animation,
+    state: 'play',
   };
 
   export let editMode: boolean = false;
@@ -74,9 +76,13 @@
   }
 
   async function toggleLyrics() {
+
+    const nextState = active ? 'play' : 'stop';
+   data = { ...data, state: nextState };
+
     if (!active) {
       // const config = { textColor, backgroundColor, font, animation };
-      const config = { ...data, state: active ? 'stop' : 'play' };
+      const config = { ...data };
       // const config = { ...data };
       // await fetch('http://localhost:8000/api/edition/lyrics/play', {
       await fetch('/api/edition/lyrics/play', {
@@ -89,8 +95,15 @@
       });
       console.log('Play Real-time Lyrics:', config);
     } else {
-      // await fetch('http://localhost:8000/api/edition/lyrics/stop', { method: 'POST' });
-      await fetch('/api/edition/lyrics/stop', { method: 'POST' });
+      // await fetch('http://localhost:8000/api/edition/lyrics/stop', { 
+      await fetch('/api/edition/lyrics/stop', { 
+        method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+         },
+         body: JSON.stringify(data)
+      });
       console.log('Stop Real-time Lyrics');
     }
     active = !active;

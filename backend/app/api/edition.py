@@ -564,7 +564,7 @@ async def play_lyrics_blocks(lyrics_data: dict, topic: str):
 
 
 @router.post("/lyrics/play")
-async def play_lyrics(data: LyricsModel):
+async def play_lyrics(data: LyricsModel, current_user = Depends(get_current_user)):
     global playing_lyrics
 
     # Stoppe la tâche précédente si elle existe
@@ -600,7 +600,7 @@ async def play_lyrics(data: LyricsModel):
     return {"status": "ok"}
 
 @router.post("/lyrics/stop")
-async def stop_lyrics():
+async def stop_lyrics(current_user = Depends(get_current_user)):
     global playing_lyrics
 
     if playing_lyrics is not None and not playing_lyrics.done():

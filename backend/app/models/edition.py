@@ -57,6 +57,7 @@ class LyricsModel(BaseModel):
     backgroundColor: str
     font: str
     animation: str
+    state: Optional[str] = None
 
 class AdsModel(BaseModel):
     textColor: str
