@@ -30,9 +30,9 @@ class QRCodeModel(BaseModel):
     url: str
 
 class QRCodePlayModel(BaseModel):
-    url: str | None = None
-    id: int | None = None
-    state: str | None = None
+    url: str
+    id: int
+    state: str
 
     class Config:
         extra = "ignore"
