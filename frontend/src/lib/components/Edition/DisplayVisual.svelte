@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
 
+  let token: string;
+
   // On stockera ici le fichier choisi
   let file: File | null = null;
   // Boolean qui indique si on est en mode "Play" actif
@@ -12,23 +14,73 @@
   // Modal “Save preset”
   let showModal = false;
 
+  // Variables pour récup la config de l'écran actuel
+  let screenCount: number = 1;
+  let matrixCount: number = 4;
+  let screenShape: string = "Square";
+
+  // Liste des 4 combinaisons autorisées
+  const validCombos: [number, number, string][] = [
+    [1, 4, "Square"],
+    [1, 9, "Square"],
+    [1, 6, "Horizontal Rectangle"],
+    [1, 6, "Vertical Rectangle"]
+  ];
+
+  // On va récup au montage la config de l'écran
+  onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+
+    try {
+      // const res = await fetch('http://localhost:8000/api/settings/config', { 
+      const res = await fetch('/api/settings/config', { 
+        method: 'GET',
+        headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // à adapter selon ta gestion
+            }
+       });
+      // const res = await fetch('/api/settings/config', { method: 'GET' });
+      if (!res.ok) {
+        console.error('Impossible de charger les settings (status ' + res.status + ')');
+        return;
+      }
+      const json = await res.json();
+      screenCount = json.screenCount;
+      matrixCount = json.matrixCount;
+      screenShape = json.screenShape;
+      console.log("Settings récupérés :", screenCount, matrixCount, screenShape);
+    } catch (e) {
+      console.error("Erreur réseau lors de la récupération des settings :", e);
+    }
+  });
+
   function openSavePresetModal() {
     showModal = true;
   }
 
   async function handleSavePreset(presetName: string) {
+    if (!uploadedFilename) {
+      return alert("Vous devez d’abord uploader une image avant de sauvegarder le preset.");
+    }
+
     const presetData = {
       type: 'visual',
       name: presetName,
       data: {
-        // tu peux ajouter data utiles ici
+        media: uploadedFilename,
+        state: 'play'
       }
     };
 
     try {
+      // const response = await fetch('http://localhost:8000/api/presets', {
       const response = await fetch('/api/presets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(presetData)
       });
 
@@ -45,6 +97,15 @@
 
   function handleFileChange(event) {
     file = event.target.files[0] ?? null;
+    console.log("Fichier sélectionné :", file);
+  }
+
+  // On vérifie si la Config est correcte 
+  function isCurrentConfigValid(): boolean {
+    return validCombos.some(
+      ([sc, mc, shape]) =>
+        sc === screenCount && mc === matrixCount && shape === screenShape
+    );
   }
 
   async function toggleVisual() {
@@ -54,6 +115,19 @@
     }
 
     if (!active) {
+      // On vérifie la config et si elle est bonne alors on upload et traite l'image
+      if (!isCurrentConfigValid()) {
+        return alert(
+          "Configuration invalide pour l'upload ! Vos réglages d'écran (" +
+            `screenCount=${screenCount}, matrixCount=${matrixCount}, screenShape='${screenShape}'` +
+            `) ne font pas partie des combinaisons autorisées :\n` +
+            "• (1, 4, 'Square')\n" +
+            "• (1, 9, 'Square')\n" +
+            "• (1, 6, 'Horizontal Rectangle')\n" +
+            "• (1, 6, 'Vertical Rectangle')"
+        );
+      }
+
       // === 1) Upload d’abord le fichier vers /upload ===
       const formData = new FormData();
       formData.append('file', file);
@@ -63,6 +137,9 @@
         // uploadResponse = await fetch('http://localhost:8000/api/edition/visual/upload', {
         uploadResponse = await fetch('/api/edition/visual/upload', {
           method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`
+          },
           body: formData
         });
       } catch (e) {
@@ -78,14 +155,17 @@
       const uploadJson = await uploadResponse.json();
       // On récupère le filename (UUID + .png)
       uploadedFilename = uploadJson.filename;
-      console.log('Upload réussi, filename =', uploadedFilename);
+      console.log('Upload réussi, filename = ' + uploadedFilename + ', width = ' + uploadJson.width + ', height = ' + uploadJson.height);
 
       // === 2) Dès que l’upload est fait, on envoie le “play” ===
       try {
         // const playResponse = await fetch('http://localhost:8000/api/edition/visual/play', {
         const playResponse = await fetch('/api/edition/visual/play', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ media: uploadedFilename })
         });
 
@@ -109,7 +189,10 @@
         // const stopResponse = await fetch('http://localhost:8000/api/edition/visual/stop', {
         const stopResponse = await fetch('/api/edition/visual/stop', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
         });
 
         if (!stopResponse.ok) {
@@ -159,7 +242,7 @@
     <button
       class="btn btn-outline btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
       on:click={openSavePresetModal}
-      disabled={active}
+      disabled={!uploadedFilename}
     >
       Save
     </button>

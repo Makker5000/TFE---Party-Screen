@@ -133,18 +133,10 @@ from pydantic import BaseModel
 from typing import List
 
 from app.db import get_db           # Dépendance synchrone
-from app.models.presets import Preset
+from app.models.presets import Preset, PresetCreate, PresetRead
+from app.models.edition import ArtistVisualDB
 
 router = APIRouter()
-
-# --- Schémas Pydantic ---
-class PresetCreate(BaseModel):
-    name: str
-    type: str
-    data: dict
-
-class PresetRead(PresetCreate):
-    id: int
 
 
 # ─── 1) Lister tous les presets ───────────────────────────────────────────────────
@@ -168,7 +160,25 @@ def create_preset(data: PresetCreate, db: Session = Depends(get_db)):
     db.add(p)
     db.commit()
     db.refresh(p)
+
     return p
+
+    # 2) Si data["media"] existe, on met à jour VisualDB.preset_id
+    # media_filename = data.data.get("media")
+    # if media_filename:
+    #     # On recherche le(s) visual dont le filename correspond
+    #     visual_row = (
+    #         db.query(ArtistVisualDB)
+    #         .filter(ArtistVisualDB.filename == media_filename)
+    #         .first()
+    #     )
+    #     if visual_row:
+    #         visual_row.preset_id = p.id
+    #         db.commit()
+    #     # else : si on ne le trouve pas, on nève rien faire (ou on pourrait lever une exception)
+    #     #    raise HTTPException(status_code=404, detail="Visual not found for this media filename")
+
+    # return p
 
 
 # ─── 3) Récupérer un preset par ID ────────────────────────────────────────────────
@@ -192,11 +202,44 @@ def update_preset(preset_id: int, data: PresetCreate, db: Session = Depends(get_
     p = db.get(Preset, preset_id)
     if not p:
         raise HTTPException(status_code=404, detail="Preset not found")
-    for field, value in data.dict().items():
-        setattr(p, field, value)
+    
     db.commit()
     db.refresh(p)
     return p
+    
+    # for field, value in data.dict().items():
+    #     setattr(p, field, value)
+
+    # 1) Détecter si l'ancien preset possédait déjà un media, pour éventuellement le détacher :
+    # old_media = p.config.get("media") if isinstance(p.config, dict) else None
+
+    # # 2) Mettre à jour les champs name, type, config
+    # p.name = data.name
+    # p.type = data.type
+    # p.config = data.data
+    # db.commit()
+    # db.refresh(p)
+
+    # # 3) Si le champ media a changé, on met à jour les VisualDB concernés
+    # new_media = data.data.get("media")
+
+    # # 3.a) Si l'ancien media existait comme filename, on le détache
+    # if old_media and old_media != new_media:
+    #     old_visual = db.query(ArtistVisualDB).filter(ArtistVisualDB.filename == old_media).first()
+    #     if old_visual and old_visual.preset_id == p.id:
+    #         # Commenter la ligne suivante si vous voulez conserver l'ancien media orphelin  
+    #         # (sinon, on le détache seulement en mettant preset_id = NULL)
+    #         old_visual.preset_id = None
+    #         db.commit()
+
+    # # 3.b) Si le nouveau media est différent (et non None), on rattache
+    # if new_media and new_media != old_media:
+    #     new_visual = db.query(ArtistVisualDB).filter(ArtistVisualDB.filename == new_media).first()
+    #     if new_visual:
+    #         new_visual.preset_id = p.id
+    #         db.commit()
+
+    # return p
 
 
 # ─── 5) Supprimer un preset ────────────────────────────────────────────────────────

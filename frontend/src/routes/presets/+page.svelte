@@ -18,6 +18,8 @@
   let showModal = false;
   let selectedPreset: Preset | null = null;
 
+  let token: string;
+
   const typeMap = {
     ads: DisplayingAds,
     visual: DisplayVisual,
@@ -25,10 +27,14 @@
     lyrics: RealTimeLyrics
   };
 
+  onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+  });
+
   async function loadPresets() {
     try {
-      const res = await fetch('http://localhost:8000/api/presets');
-      // const res = await fetch('/api/presets');
+      // const res = await fetch('http://localhost:8000/api/presets');
+      const res = await fetch('/api/presets');
       if (!res.ok) throw new Error('Failed to load presets');
       presets = await res.json();
     } catch (error) {
@@ -37,26 +43,17 @@
   }
 
 
-//   async function onPlayStop(event: CustomEvent) {
-//     const id = event.detail.id;
-//     const preset = presets.find(p => p.id === id);
-//     if (!preset) return;
-//     try {
-//       await goto(`/api/edition/${preset.type}/toggle/${preset.id}`);
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   }
   async function onPlayStop(event: CustomEvent) {
     const preset = presets.find(p => p.id === event.detail.id);
-    // if (preset) goto(`http://localhost:8000/api/edition/${preset.type}/toggle/${preset.id}`);
-    // if (preset) goto(`/api/edition/${preset.type}/toggle/${preset.id}`);
     console.log(preset);
     if (preset.data.state == "play") {
         // await fetch(`http://localhost:8000/api/edition/${preset.type}/play`, {
         await fetch(`/api/edition/${preset.type}/play`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(preset.data)
         });
         preset.data.state = "stop";
@@ -65,7 +62,10 @@
         // await fetch(`http://localhost:8000/api/edition/${preset.type}/stop`, {
         await fetch(`/api/edition/${preset.type}/stop`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(preset.data)
         });
         preset.data.state = "play";
@@ -74,18 +74,6 @@
   }
 
 
-//   async function onDelete(event: CustomEvent) {
-//     const id = event.detail.id;
-//     const preset = presets.find(p => p.id === id);
-//     if (!preset) return;
-//     if (!confirm(`Supprimer le preset « ${preset.name} » ?`)) return;
-//     try {
-//       await fetch(`http://localhost:8000/api/presets/${preset.id}`, { method: 'DELETE' });
-//       await loadPresets();
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   }
   async function onDelete(event: CustomEvent) {
     const preset = presets.find(p => p.id === event.detail.id);
     if (!preset) return;
@@ -95,13 +83,6 @@
     await loadPresets();
   }
 
-//   function onModify(event: CustomEvent) {
-//     const id = event.detail.id;
-//     const preset = presets.find(p => p.id === id);
-//     if (!preset) return;
-//     selectedPreset = { ...preset };
-//     showModal = true;
-//   }
   function onModify(event: CustomEvent) {
     const preset = presets.find(p => p.id === event.detail.id);
     if (!preset) return;
@@ -116,11 +97,7 @@
 
   async function saveModifiedPreset() {
     if (!selectedPreset) return;
-    // const updated: Partial<Preset> = {
-    //   type: selectedPreset.type,
-    //   name: selectedPreset.name,
-    //   data: selectedPreset.data
-    // };
+
     const updated = {
       type: selectedPreset.type,
       name: selectedPreset.name,
@@ -131,9 +108,9 @@
     console.log('Payload envoyé :', updated);
 
     try {
-    //   const response = await fetch(`http://localhost:8000/api/presets/${selectedPreset.id}`, {
-    const response = await fetch(`/api/presets/${selectedPreset.id}`, {
-    //   await fetch(`/api/presets/${selectedPreset.id}`, {
+      // const response = await fetch(`http://localhost:8000/api/presets/${selectedPreset.id}`, {
+      const response = await fetch(`/api/presets/${selectedPreset.id}`, {
+      // await fetch(`/api/presets/${selectedPreset.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)

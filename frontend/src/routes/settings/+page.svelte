@@ -74,6 +74,7 @@
        },
       body: JSON.stringify(payload)
     });
+    alert("Paramètres écran bien mis à jour !")
   }
 </script>
 

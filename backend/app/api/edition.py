@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel, ArtistVisualDB
 from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
 from app.core.config import MQTT_TOPIC
@@ -19,6 +19,11 @@ import math
 
 from PIL import Image
 import json
+
+from sqlalchemy.orm import Session
+from app.db import get_db
+from app.utils.usersAuth import get_current_user
+from app.models.settings import SettingsDB
 
 router = APIRouter()
 
@@ -47,147 +52,211 @@ async def get_brightness():
 
 
 # ################################ ARTIST VISUALS ################################
-SETTINGS_PATH = "app/data/settings.json"
 UPLOAD_DIR_VISUAL = "app/uploads/visuals"
-
-def load_settings():
-    if os.path.exists(SETTINGS_PATH):
-        with open(SETTINGS_PATH, "r") as f:
-            return json.load(f)
-    return {
-        "screenCount": 1,
-        "matrixCount": 4,
-        "screenShape": "Square"
-    }
+ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"]
+ALLOWED_VIDEO_TYPES = ["video/mp4"]
 
 @router.post("/visual/upload")
-async def upload_visual(file: UploadFile = File(...)):
-    settings = load_settings()
-    matrix_count = settings["matrixCount"]
-    screen_count = settings["screenCount"]
-    shape = settings["screenShape"]
+async def upload_visual(file: UploadFile = File(...), db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    """
+    1. On récupère la ligne 'settings' en base pour l'utilisateur.
+    2. On vérifie que (screen_count, matrix_count, screen_shape) est l'une des 4 combinaisons autorisées :
+       - (1, 4, "Square")
+       - (1, 9, "Square")
+       - (1, 6, "Horizontal Rectangle")
+       - (1, 6, "Vertical Rectangle")
+       Sinon on renvoie HTTPException(400).
+    3. On calcule width/height en fonction de cette config, on redimensionne si image, on stocke, etc.
+    """
 
-    # ✅ Vérif : minimum 4 matrices et 1 écran
-    if matrix_count < 4 or screen_count < 1:
-        raise HTTPException(status_code=400, detail="Configuration invalide : minimum 4 matrices et 1 écran requis.")
+    # ──── 1) Récupération des settings depuis la table en base ────
+    settings_row = (
+        db.query(SettingsDB)
+        .filter(SettingsDB.user_id == current_user.id)
+        .first()
+    )
 
-    # ✅ Déduire résolution globale
+    if settings_row is None:
+        # Si jamais l’utilisateur n’a pas enregistré de settings, on peut choisir des valeurs par défaut
+        screen_count = 1
+        matrix_count = 4
+        shape = "Square"
+    else:
+        screen_count = int(settings_row.screen_count)
+        matrix_count = int(settings_row.matrix_count)
+        shape = settings_row.screen_shape
+
+    # ──── 2) Vérification des combinaisons autorisées ────
+    # On calcule un tuple pour simplifier la comparaison
+    combo = (screen_count, matrix_count, shape)
+
+    valid_combos = [
+        (1, 4, "Square"),
+        (1, 9, "Square"),
+        (1, 6, "Horizontal Rectangle"),
+        (1, 6, "Vertical Rectangle"),
+    ]
+
+    if combo not in valid_combos:
+        # Le détail du message peut être personnalisé :
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Configuration invalide : les paramètres actuels ("
+                f"screenCount={screen_count}, matrixCount={matrix_count}, screenShape='{shape}') "
+                "doivent être l’une de ces combinaisons :\n"
+                "• (1, 4, 'Square')\n"
+                "• (1, 9, 'Square')\n"
+                "• (1, 6, 'Horizontal Rectangle')\n"
+                "• (1, 6, 'Vertical Rectangle')"
+            )
+        )
+
+    # ──── 3) On calcule width/height en fonction du shape et matrix_count ────
     if shape == "Square":
-        # On s'assure que matrix_count est un carré parfait avant de faire la racine
+        # On s'assure que matrix_count est un carré parfait
         side_matrices = int(math.isqrt(matrix_count))
         if side_matrices * side_matrices != matrix_count:
             raise HTTPException(
                 status_code=400,
-                detail=f"Pour shape='square', matrixCount={matrix_count} doit être un carré parfait "
-                       f"(ex : 4, 9, 16, ...)."
+                detail=(
+                    f"Pour shape='Square', matrixCount={matrix_count} doit être un carré parfait "
+                    "(exemple : 4, 9, 16, …)."
+                )
             )
-        # Exemple pour 4 matrices : sqrt(4)=2 → 2*16 = 32 × 32
-        width = side_matrices * 16
-        height = side_matrices * 16
-    else:
-        # Pour un écran « horizontal » (ou « vertical ») classique
-        # largeur = nombre total de matrices horizontales × 16
-        # hauteur = 16 pixels × nombre d'écrans verticaux
-        width = matrix_count * 16
-        height = 16 * screen_count
+        width = int(side_matrices * 16)
+        height = int(side_matrices * 16)
 
-    # Vérifier type
-    allowed_types = ["image/jpeg", "image/png", "image/gif", "video/mp4"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Type de fichier non supporté")
+    elif shape == "Horizontal Rectangle":
+        # Pour « Horizontal Rectangle » ou « Vertical Rectangle »
+        # largeur = nombre de matrices horizontales × 16
+        # hauteur = nombre de matrices verticales × 16  (screen_count vaut 1 ici)
+        width = int((6 / 2) * 16)
+        height = int((6 / 3) * 16)
+
+    elif shape == "Vertical Rectangle":
+        # Pour « Horizontal Rectangle » ou « Vertical Rectangle »
+        # largeur = nombre de matrices horizontales × 16
+        # hauteur = nombre de matrices verticales × 16  (screen_count vaut 1 ici)
+        width = int((6 / 3) * 16)
+        height = int((6 / 2) * 16)
     
-    # Créer dossier d’upload s’il n’existe pas
-    os.makedirs(UPLOAD_DIR_VISUAL, exist_ok=True)
+    else : 
+        # On s'assure que matrix_count est un carré parfait
+        side_matrices = int(math.isqrt(matrix_count))
+        if side_matrices * side_matrices != matrix_count:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Pour shape='Square', matrixCount={matrix_count} doit être un carré parfait "
+                    "(exemple : 4, 9, 16, …)."
+                )
+            )
+        width = int(side_matrices * 16)
+        height = int(side_matrices * 16)
 
-    # Nom unique
+
+     # ─── 4) Vérification du type de fichier ───
+    content_type = file.content_type or ""
+    is_image = content_type.startswith("image/")
+    is_video = content_type.startswith("video/")
+
+    if is_image and content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Type d'image non supporté.")
+    if is_video and content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(status_code=400, detail="Type de vidéo non supporté.")
+
+    # Génération d'un nom unique (UUID + extension)
     ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(UPLOAD_DIR_VISUAL, unique_filename)
 
-    # 🔧 Redimensionner image si besoin
-    if file.content_type.startswith("image"):
+    if is_image:
+        # ─── 4.a) On redimensionne l'image en PIL ───
         img = Image.open(file.file).convert("RGB")
         resized_img = img.resize((width, height))
-        resized_img.save(file_path, format="PNG")
 
-        # 3) Convertir en RAW565
+        # ─── 4.b) Génération du raw888 → base64 ───
         pixels = resized_img.load()
         raw888 = bytearray()
         for y in range(height):
             for x in range(width):
                 r, g, b = pixels[x, y]
-                # On prend directement les valeurs 8 bits pour chaque canal
-                raw888.append(r)
-                raw888.append(g)
-                raw888.append(b)
+                raw888.extend([r, g, b])
 
-        # 4) Encoder ce raw888 en Base64
         b64_data = base64.b64encode(bytes(raw888)).decode("utf-8")
 
-        # 5) Sauvegarder la chaîne Base64 dans un fichier .b64 (même basename + ".b64")
-        b64_filename = unique_filename + ".b64"
-        b64_path = os.path.join(UPLOAD_DIR_VISUAL, b64_filename)
-        with open(b64_path, "w") as f_b64:
-            f_b64.write(b64_data)
+        # ─── 4.c) Insertion dans la table `visuals` ───
+        new_visual = ArtistVisualDB(
+            filename=unique_filename,
+            data_base64=b64_data
+        )
+        db.add(new_visual)
+        db.commit()
+        db.refresh(new_visual)  # pour récupérer new_visual.id
 
-    else:
-        # Vidéos, gif → sauvegarde brut
+        # ──── 6) Réponse JSON  ────
+        return {
+            "status": "Upload réussi",
+            "id": new_visual.id,
+            "filename": unique_filename,
+            "width": width,
+            "height": height,
+            "is_image": True
+        }
+    
+    else :
+        # ─── 4.d) POUR LES VIDÉOS (optionnel) ───
+        # On sauvegarde toujours dans un dossier pour les vidéos (pas de base64)
+        os.makedirs(UPLOAD_DIR_VISUAL, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR_VISUAL, unique_filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        # On met b64_data à None pour signaler qu’il n’y a pas de RAW565
-        b64_data = None
-        b64_filename = None
 
-    return {
-        "status": "Upload réussi",
-        "filename": unique_filename,   # Renvoie au front pour la suite “Play”
-        "width": width,
-        "height": height,
-        "has_raw888": b64_data is not None
-    }
-    
+        return {
+            "status": "Upload réussi",
+            "id": None,
+            "filename": unique_filename,
+            "width": width,
+            "height": height,
+            "is_image": False
+        }
+
 
 @router.post("/visual/play")
-async def play_visual(req: ArtistVisualModel):
+async def play_visual(req: dict, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
-    - Lit le fichier Base64 précédemment généré lors de l’upload (<filename>.b64).
-    - Construit le payload MQTT : { "FLAG": "VISUAL_PLAY", "picture": "<base64_RAW565>" }.
-    - Envoie tout ça sur le topic configuré.
+    On s’attend à recevoir JSON : { "media": "<filename>" }
+    Pour les images, on va rechercher le base64 en DB via le filename.
     """
-    unique_filename = req.media
-    b64_filename    = unique_filename + ".b64"
-    b64_path        = os.path.join(UPLOAD_DIR_VISUAL, b64_filename)
+    filename = req.get("media")
+    if not filename:
+        raise HTTPException(status_code=400, detail="Le champ 'media' est requis.")
 
-    # Vérifier que le fichier .b64 existe
-    if not os.path.exists(b64_path):
-        raise HTTPException(status_code=404, detail=f"Le fichier Base64 pour '{unique_filename}' n'existe pas.")
+    # ─── 1) On cherche dans la table `visuals` le base64 associé
+    visual_row = db.query(ArtistVisualDB).filter(ArtistVisualDB.filename == filename).first()
+    if not visual_row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Aucune image en base pour le filename '{filename}'."
+        )
 
-    # Charger la chaîne Base64
-    with open(b64_path, "r") as f:
-        b64_data = f.read().strip()
-
-    # Construire le payload MQTT
+    # ─── 2) On construit le payload MQTT pour l’image
     payload = {
         "FLAG": "VISUAL_PLAY",
-        "picture": b64_data
+        "picture": visual_row.data_base64
     }
-
     publish(MQTT_TOPIC, payload)
 
-    return {"status": "Play command envoyé", "filename": unique_filename}
+    return {"status": "Play command envoyé", "filename": filename}
 
 
 @router.post("/visual/stop")
-async def stop_visual():
+async def stop_visual(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
-    - Envoie simplement { "FLAG": "VISUAL_STOP" } sur le broker MQTT.
+    Envoie simplement {"FLAG": "VISUAL_STOP"} sur le broker MQTT.
     """
-    payload = {
-        "FLAG": "VISUAL_STOP"
-    }
-
+    payload = { "FLAG": "VISUAL_STOP" }
     publish(MQTT_TOPIC, payload)
-
     return {"status": "Stop command envoyé"}
 
 

@@ -1,6 +1,17 @@
 # app/models/preset.py
 from sqlalchemy import Column, Integer, String, JSON, TIMESTAMP, func
 from app.db import Base
+from pydantic import BaseModel
+from sqlalchemy.orm import relationship
+
+# --- Schémas Pydantic ---
+class PresetCreate(BaseModel):
+    name: str
+    type: str
+    data: dict
+
+class PresetRead(PresetCreate):
+    id: int
 
 class Preset(Base):
     __tablename__ = "presets"
@@ -16,3 +27,6 @@ class Preset(Base):
         onupdate=func.now(),
         nullable=False
     )
+
+    # Relation bidirectionnelle vers VisualDB
+    visuals = relationship("ArtistVisualDB", back_populates="preset", cascade="all, delete-orphan")
