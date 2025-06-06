@@ -1,5 +1,6 @@
 <script lang="ts">
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
+    import { onMount } from 'svelte';
 
   let url = '';
   let defaultUrl = 'http://localhost:5173/lyrics';
@@ -11,15 +12,29 @@
   let qrGenerated = false;
   let isLoading = false;
 
-  export let data: {
-    url: string;
-  } = {
-    url: currentUrl,
-  };
+  // Var pour stocker le filename renvoyé par le backend
+  let qrFilename: string | null = null;
+  let qrId: number | null = null;
 
   export let editMode: boolean = false;
   let active = false;
   let showModal = false;
+
+  let state = active ? 'stop' : 'play';
+
+  export let data: {
+    url: string;
+    state: string;
+  } = {
+    url: currentUrl,
+    state: state
+  }; 
+
+  let token: string;
+
+  onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+  });
 
   function openSavePresetModal() {
     showModal = true;
@@ -30,7 +45,7 @@
       type: 'qrcode',
       name: presetName,
       data: {
-        url: currentUrl,
+        ...data
       }
     };
 
@@ -41,7 +56,8 @@
         const response = await fetch('/api/presets', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(presetData)
         });
@@ -66,23 +82,35 @@
     }
     
     isLoading = true;
+    qrGenerated = false;
+    qrFilename = null;
     
     try {
       // const response = await fetch('http://localhost:8000/api/edition/qrcode', {
       const response = await fetch('/api/edition/qrcode', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ url: currentUrl })
       });
       
       if (!response.ok) {
-        throw new Error('Erreur lors de la génération du QR Code');
+        let detail = `Status ${response.status}`;
+        try {
+          const err = await response.json();
+          if (err.detail) detail = err.detail;
+        } catch {}
+        // throw new Error('Erreur lors de la génération du QR Code');
+        throw new Error(detail);
       }
       
-      // NOUVEAU: Récupérer l'image du QR Code
+      // NOUVEAU: Récupérer l'image du QR Code et le filename
       const result = await response.json();
       qrImageSrc = result.image;
       qrGenerated = true;
+      qrFilename = result.filename;
       
       console.log('QR Code généré:', result);
       
@@ -95,26 +123,72 @@
   }
 
   async function toggleQr() {
-    if (!active && !currentUrl) {
-      alert('Veuillez générer un QR Code avant de lancer la lecture.');
-      return;
+
+    if (!qrGenerated || qrId === null) {
+      state = active ? 'play' : 'stop';
+      // Si le preset envoie juste data.url, on peut faire l'appel directement à /play avec { url }
+      // afin de créer le record DB à la volée. Par défaut, on prend qrId si déjà généré localement.
+      data = { url: data.url, state };
+      if (data) {
+        try {
+          // const response = await fetch('http://localhost:8000/api/edition/qrcode/play', {
+          const response = await fetch('/api/edition/qrcode/play', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+          });
+          if (!response.ok) {
+            let detail = `Status ${response.status}`;
+            try { const err = await response.json(); if (err.detail) detail = err.detail; } catch {}
+            throw new Error(detail);
+          }
+          const resPlay = await response.json();
+          qrId = resPlay.id; // si le backend a généré le record à la volée
+          active = true;
+        } catch (err) {
+          console.error('Erreur Play QR:', err);
+          alert('Erreur lors du play du QR Code : ' + err);
+        }
+        return;
+      } else {
+        alert('Impossible de jouer : ni QR généré ni URL fournie.');
+        return;
+      }
     }
+
+    // Si qrId existe, on appelle /stop ou /play selon active
     const endpoint = active
       ? '/api/edition/qrcode/stop'
       : '/api/edition/qrcode/play';
     // const endpoint = active
     //   ? 'http://localhost:8000/api/edition/qrcode/stop'
     //   : 'http://localhost:8000/api/edition/qrcode/play';
-    const payload = { url: active ? 'stop' : 'play' };
+    const payload = { id: qrId, state };
 
-    await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    active = !active;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        let detail = `Status ${response.status}`;
+        try { const err = await response.json(); if (err.detail) detail = err.detail; } catch {}
+        throw new Error(detail);
+      }
+      active = !active;
+    } catch (err) {
+      console.error('Erreur toggle QR :', err);
+      alert('Erreur lors du ' + (active ? 'stop' : 'play') + ' du QR : ' + err);
+    }
   }
+
 </script>
 
 <div class="flex flex-col items-center space-y-4 py-4">

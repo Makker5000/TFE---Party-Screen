@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel, ArtistVisualDB
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
+from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel, ArtistVisualDB, QrcodeDB
 from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
 from app.core.config import MQTT_TOPIC
@@ -263,45 +263,79 @@ async def stop_visual(db: Session = Depends(get_db), current_user = Depends(get_
 # ################################### QRCODE ####################################
 DEFAULT_URL = "http://localhost:5173/lyrics"
 UPLOAD_DIR_QRCODE = "app/uploads/qrcodes"
+os.makedirs(UPLOAD_DIR_QRCODE, exist_ok=True)
 
-@router.post("/qrcode")
-async def generate_qrcode(data: QRCodeModel):
-    # 1) Génération QR PIL.Image
+@router.post("/qrcode", status_code=status.HTTP_200_OK)
+async def generate_qrcode(data: QRCodeModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    # 1) On va chercher la config de l'écran et on Vérifie les conditions 
+    settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
+    # S'il n'y a pas de ligne settings, on considère les valeurs par défaut (1,9,"Square")
+    if not settings_row:
+        screen_count, matrix_count, screen_shape = 1, 9, "Square"
+    else:
+        screen_count = int(settings_row.screen_count)
+        matrix_count = int(settings_row.matrix_count)
+        screen_shape = settings_row.screen_shape
+
+    # Vérification stricte de la combinaison autorisée
+    if not (screen_count == 1 and matrix_count == 9 and screen_shape == "Square"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Configuration invalide pour QR Code : "
+                f"(screenCount={screen_count}, matrixCount={matrix_count}, screenShape='{screen_shape}'). "
+                "Seule la configuration (1, 9, 'Square') est autorisée."
+            )
+        )
+
+    # 2) Génération QR PIL.Image
     url = data.url or DEFAULT_URL
     qr_img = create_qr_code(url)
 
-    # 2) Charger config écran
-    if os.path.exists(SETTINGS_PATH):
-        settings = json.load(open(SETTINGS_PATH))
-    else:
-        settings = {"screenCount":1, "matrixCount":9, "screenShape":"square"}
 
-    # 3) Redimensionner vers une PIL.Image finale
-    resized_img = resize_qr_code(qr_img,
-                                  settings["screenCount"],
-                                  settings["matrixCount"],
-                                  settings["screenShape"])
+    # 4) Redimensionner vers une PIL.Image finale 48x48
+    resized_img = resize_qr_code(qr_img)
 
-    # 4) Conversion en raw RGB888 base64
+    # 5) Conversion en raw RGB888 base64
     width, height, raw_b64 = qr_to_raw_base64(resized_img)
 
-    # 4bis) On génère un nom de fichier unique et puis on sauvegarde
-    filename_base = str(uuid.uuid4())
-    png_path = os.path.join(UPLOAD_DIR_QRCODE, f"{filename_base}.png")
-    b64_path = os.path.join(UPLOAD_DIR_QRCODE, f"{filename_base}.txt")
+    # Chercher s'il existe déjà en DB pour ce user+URL
+    existing = (
+        db.query(QrcodeDB)
+        .filter(QrcodeDB.user_id == current_user.id, QrcodeDB.url == url)
+        .first()
+    )
 
+    if existing:
+        # on met juste à jour data_base64
+        existing.data_base64 = raw_b64
+        db.commit()
+        qrcode_id = existing.id
+    else:
+        # on crée un nouveau record
+        new_qr = QrcodeDB(
+            user_id=current_user.id,
+            url=url,
+            data_base64=raw_b64,
+            preset_id=None
+        )
+        db.add(new_qr)
+        db.commit()
+        db.refresh(new_qr)
+        qrcode_id = new_qr.id
 
-    # 5) Publication MQTT
-    # payload = {
-    #     "FLAG": "DISPLAY_QR",
-    #     "width": width,
-    #     "height": height,
-    #     "data": raw_b64,
-    #     "qr_content": url,
-    # }
-    # publish(MQTT_TOPIC, payload)
+    # # 5bis) On génère un nom de fichier unique et puis on sauvegarde
+    # filename_base = str(uuid.uuid4())
+    # png_path = os.path.join(UPLOAD_DIR_QRCODE, f"{filename_base}.png")
+    # b64_path = os.path.join(UPLOAD_DIR_QRCODE, f"{filename_base}.txt")
 
-    # 6) NOUVEAU: Conversion pour le frontend (base64 standard)
+    # # 5.a) Sauvegarder l'image PNG (pour affichage éventuel)
+    # resized_img.save(png_path, format="PNG")
+    # # 5.b) Sauvegarder la chaîne raw888 Base64 dans .txt
+    # with open(b64_path, "w", encoding="utf-8") as f_txt:
+    #     f_txt.write(raw_b64)
+
+    # 7) NOUVEAU: Conversion pour le frontend (base64 standard)
     # Convertir PIL Image en base64 PNG pour l'affichage web
     buffer = io.BytesIO()
     resized_img.save(buffer, format='PNG')
@@ -309,39 +343,113 @@ async def generate_qrcode(data: QRCodeModel):
     
     return {
         "status": "QR Code generated and sent",
+        "id": qrcode_id,
         "image": f"data:image/png;base64,{img_base64}",
         "width": width,
-        "height": height
+        "height": height,
+        "url": url
     }
 
 
-# @router.post("/qrcode/play")
-# async def play_qrcode(data: QRCodePlayModel):
-#     b64_file = os.path.join(UPLOAD_DIR_QRCODE, f"{data.filename}.txt")
-#     if not os.path.isfile(b64_file):
-#         raise HTTPException(status_code=404, detail="QR Code not found")
+@router.post("/qrcode/play", status_code=status.HTTP_200_OK)
+async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    # 1) Lecture des settings (on valide la même condition)
+    settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
+    if not settings_row:
+        sc, mc, shape = 1, 9, "Square"
+    else:
+        sc = int(settings_row.screen_count)
+        mc = int(settings_row.matrix_count)
+        shape = settings_row.screen_shape
+    if not (sc == 1 and mc == 9 and shape == "Square"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Config invalide (screenCount={sc}, matrixCount={mc}, screenShape='{shape}'). "
+                "Seule (1,9,'Square') autorisée."
+            )
+        )
+    
+    qr_row = None
+    url = None
+    raw_b64 = None
 
-#     with open(b64_file, 'r') as f:
-#         raw_b64 = f.read()
+    # 2) Si on reçoit un ID
+    if data.id is not None:
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+        raw_b64 = qr_row.data_base64
+        url = qr_row.url
 
-#     payload = {
-#         "FLAG": "QR_PLAY",
-#         "width": 48,
-#         "height": 48,
-#         "data": raw_b64,
-#         "qr_content": f"from file: {data.filename}",
-#     }
-#     publish(MQTT_TOPIC, payload)
+    # 3) Sinon si on reçoit une URL
+    elif data.url:
+        url = data.url
+        # Chercher en DB si déjà existant
+        qr_row = (
+            db.query(QrcodeDB)
+            .filter(QrcodeDB.user_id == current_user.id, QrcodeDB.url == url)
+            .first()
+        )
+        if qr_row:
+            raw_b64 = qr_row.data_base64
+        else:
+            # on génère en mémoire sans PNG, direct raw888
+            qr_img = create_qr_code(url)
+            resized_img = resize_qr_code(qr_img)
+            _, _, raw_b64 = qr_to_raw_base64(resized_img)
 
-#     return {"status": "QR Code replayed", "filename": data.filename}
+            # Créer le record en DB
+            new_qr = QrcodeDB(
+                user_id=current_user.id,
+                url=url,
+                data_base64=raw_b64,
+                preset_id=None
+            )
+            db.add(new_qr)
+            db.commit()
+            db.refresh(new_qr)
+            qr_row = new_qr
 
-# @router.post("/qrcode/stop")
-# async def stop_qrcode():
-#     payload = {
-#         "FLAG": "QR_STOP"
-#     }
-#     publish(MQTT_TOPIC, payload)
-#     return {"status": "QR Code display stopped"}
+    else:
+        raise HTTPException(status_code=422, detail="Il faut fournir `id` ou `url`.")
+
+    # 4) Si l’appel vient d’un preset (dans data.url on pourrait avoir preset_id),
+    #    on met à jour preset_id de ce QR. Mais la page Preset envoie seulement { url }, donc :
+    #    on peut lier simplement le dernier preset de l’utilisateur si utile, ou laisser preset_id à None.
+    #    Vous pouvez adapter ici pour lier au preset qui a lancé l’appel.
+
+    # 5) Enfin, on publie sur MQTT
+    payload = {
+        "FLAG": "QR_PLAY",
+        "width": 48,
+        "height": 48,
+        "data": raw_b64,
+        "qr_content": url
+    }
+    publish(MQTT_TOPIC, payload)
+
+    return {"status": "QR Code played", "id": qr_row.id, "url": url}
+
+
+@router.post("/qrcode/stop", status_code=status.HTTP_200_OK)
+async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    if data.id is not None:
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+
+        # 1) Supprimer de la BD
+        db.delete(qr_row)
+        db.commit()
+
+    # 2) Publier le FLAG stop
+    payload = {"FLAG": "QR_STOP"}
+    publish(MQTT_TOPIC, payload)
+
+    return {"status": "QR Code stopped and deleted", "id": data.id}
 
 
 

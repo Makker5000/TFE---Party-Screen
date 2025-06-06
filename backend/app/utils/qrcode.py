@@ -98,10 +98,7 @@ def create_qr_code(url: str) -> Image.Image:
     return qr_image
 
 # Redimensionner pour produire une PIL.Image finale
-def resize_qr_code(img: Image.Image,
-                    screen_count: int,
-                    matrix_count: int,
-                    shape: str) -> Image.Image:
+def resize_qr_code(img: Image.Image) -> Image.Image:
     width = 48
     height = 48
     target_size = (width, height)

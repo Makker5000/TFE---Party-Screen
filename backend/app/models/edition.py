@@ -30,7 +30,26 @@ class QRCodeModel(BaseModel):
     url: str
 
 class QRCodePlayModel(BaseModel):
-    filename: str
+    url: str | None = None
+    id: int | None = None
+    state: str | None = None
+
+    class Config:
+        extra = "ignore"
+
+class QrcodeDB(Base):
+    __tablename__ = "qrcodes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    preset_id = Column(Integer, ForeignKey("presets.id", ondelete="CASCADE"), nullable=True)
+    url = Column(String(2048), nullable=False, index=True)
+    data_base64 = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relations ORM
+    user = relationship("User", back_populates="qrcodes")
+    preset = relationship("Preset", back_populates="qrcodes")
 
 class LyricsModel(BaseModel):
     textColor: str

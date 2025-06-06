@@ -46,6 +46,11 @@
   async function onPlayStop(event: CustomEvent) {
     const preset = presets.find(p => p.id === event.detail.id);
     console.log(preset);
+
+    if (!preset) return;
+
+    // Si preset est indéfini alors on le définit
+    const state = preset.data.state ?? "play";
     if (preset.data.state == "play") {
         // await fetch(`http://localhost:8000/api/edition/${preset.type}/play`, {
         await fetch(`/api/edition/${preset.type}/play`, {
@@ -110,7 +115,6 @@
     try {
       // const response = await fetch(`http://localhost:8000/api/presets/${selectedPreset.id}`, {
       const response = await fetch(`/api/presets/${selectedPreset.id}`, {
-      // await fetch(`/api/presets/${selectedPreset.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)

@@ -1,10 +1,3 @@
-<!-- <h1 class="text-2xl text-center my-8">Login</h1>
-<div class="flex flex-col items-center gap-4">
-  <input type="text" placeholder="Login" class="input input-bordered w-full max-w-xs" />
-  <input type="password" placeholder="Mot de passe" class="input input-bordered w-full max-w-xs" />
-  <button class="btn btn-primary w-full max-w-xs">Log in</button>
-</div> -->
-
 <!-- src/routes/login/+page.svelte -->
 <script lang="ts">
   let username = '';
@@ -12,12 +5,6 @@
 
   async function login(username: string, password: string) {
     try {
-        // const res = await fetch('http://localhost:8000/api/users/login', {
-        // // const res = await fetch('/api/users/login', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify({ username, password })
-        // });
 
         // const res = await fetch('http://localhost:8000/api/users/login', {
         const res = await fetch('/api/users/login', {

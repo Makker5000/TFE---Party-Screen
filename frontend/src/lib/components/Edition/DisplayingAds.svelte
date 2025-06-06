@@ -1,5 +1,6 @@
 <script lang="ts">
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
+  import { onMount } from 'svelte';
 
   let textColor = 'white';
   let backgroundColor = 'black';
@@ -35,6 +36,13 @@
   export let editMode: boolean = false;
   let showModal = false;
 
+  let token: string;
+
+  onMount(async () => {
+    token = localStorage.getItem('token') ?? '';
+  });
+
+
   function openSavePresetModal() {
     showModal = true;
   }
@@ -44,13 +52,14 @@
       type: 'ads',
       name: presetName,
       data: { ...data } };
-    // const method = editMode ? 'PUT' : 'POST';
-    // const url = editMode && data ? `/api/presets/${data.id}` : '/api/presets';
     // const url = 'http://localhost:8000/api/presets';
     const url = '/api/presets';
     await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(presetData)
     });
     showModal = false;
@@ -63,7 +72,10 @@
     const url = active ? '/api/edition/ads/stop' : '/api/edition/ads/play';
     await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(config)
     });
     active = !active;
@@ -72,6 +84,7 @@
 
 <div class="flex flex-col items-center space-y-4 py-4 text-white">
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Text Color</span></label>
     <select bind:value={data.textColor} class="select select-bordered w-full">
       {#each availableTextColors as color}
@@ -81,6 +94,7 @@
   </div>
 
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Background Color</span></label>
     <select bind:value={data.backgroundColor} class="select select-bordered w-full">
       {#each availableBgColors as color}
@@ -90,6 +104,7 @@
   </div>
 
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Font</span></label>
     <select bind:value={data.font} class="select select-bordered w-full">
       {#each availableFonts as f}
@@ -99,6 +114,7 @@
   </div>
 
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Animation</span></label>
     <select bind:value={data.animation} class="select select-bordered w-full">
       {#each availableAnimations as a}
@@ -108,11 +124,13 @@
   </div>
 
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Speed</span></label>
     <input type="range" min="0" max="10" step="1" bind:value={data.speed} class="range range-accent w-full" />
   </div>
 
   <div class="w-full max-w-xs">
+    <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Content</span></label>
     <input type="text" bind:value={data.content} placeholder="Enter a message" class="input input-bordered w-full" />
   </div>
@@ -121,14 +139,14 @@
     <div class="flex space-x-2">
       <button
         on:click={toggleAds}
-        class="btn btn-outline btn-sm btn-lg"
+        class="btn btn-outline btn-lg"
         class:btn-success={!active}
         class:btn-error={active}
       >
         {active ? 'Stop' : 'Play'}
       </button>
       <button 
-        class="btn btn-outline btn-sm btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
+        class="btn btn-outline btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
         on:click={openSavePresetModal}
       >
         Save

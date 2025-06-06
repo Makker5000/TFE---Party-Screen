@@ -135,6 +135,8 @@ from typing import List
 from app.db import get_db           # Dépendance synchrone
 from app.models.presets import Preset, PresetCreate, PresetRead
 from app.models.edition import ArtistVisualDB
+from app.models.user import User
+from app.utils.usersAuth import get_current_user
 
 router = APIRouter()
 
@@ -152,11 +154,16 @@ def list_presets(db: Session = Depends(get_db)):
 
 # ─── 2) Créer un nouveau preset ───────────────────────────────────────────────────
 @router.post("/", response_model=PresetRead, status_code=status.HTTP_201_CREATED)
-def create_preset(data: PresetCreate, db: Session = Depends(get_db)):
+def create_preset(data: PresetCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Crée un preset avec les champs {name, type, data} et le sauve en base.
     """
-    p = Preset(**data.dict())
+    p = Preset(
+        user_id=current_user.id,
+        name=data.name,
+        type=data.type,
+        data=data.data
+    )
     db.add(p)
     db.commit()
     db.refresh(p)
@@ -202,6 +209,13 @@ def update_preset(preset_id: int, data: PresetCreate, db: Session = Depends(get_
     p = db.get(Preset, preset_id)
     if not p:
         raise HTTPException(status_code=404, detail="Preset not found")
+    
+    for field, value in data.dict().items():
+        setattr(p, field, value)
+
+    p.name = data.name
+    p.type = data.type
+    p.data = data.data
     
     db.commit()
     db.refresh(p)
