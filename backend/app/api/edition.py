@@ -454,164 +454,249 @@ async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
 
 
 # ######################################## LYRICS ############################################
+# UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
+# UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
+
+# AUDIO_PATH = UPLOAD_DIR_LYRICS / "test.wav"
+
+# playing_lyrics: Union[asyncio.Task, None] = None
+
+# async def record_and_get_path(durée: int = 15) -> Path:
+#     # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
+#     # cmd = [
+#     #     "arecord",
+#     #     "-D", "plughw:1,0",        # adapte à ton device
+#     #     "-f", "cd",
+#     #     "-t", "wav",
+#     #     "-d", str(durée),
+#     #     str(AUDIO_PATH)
+#     # ]
+#     # subprocess.run(cmd, check=True)
+#     # return AUDIO_PATH
+
+#     sample_rate = 44100  # Qualité CD
+#     print(f"📢 Enregistrement audio de {durée} secondes...")
+#     audio = sd.rec(int(durée * sample_rate), samplerate=sample_rate, channels=2)
+#     sd.wait()  # Attend la fin de l'enregistrement
+#     write(str(AUDIO_PATH), sample_rate, audio)
+#     return AUDIO_PATH
+
+
+# def recognize_music_with_audd(file_path: str) -> dict:
+#     """
+#     Envoie un fichier audio à l'API AudD pour reconnaissance musicale.
+    
+#     Args:
+#         file_path (str): Chemin vers le fichier audio.
+#         api_token (str): Clé API AudD.
+
+#     Returns:
+#         dict: Dictionnaire contenant l'artiste, le titre, ou une erreur.
+#     """
+#     url = "https://api.audd.io/"
+
+#     load_dotenv()  # lit ton .env
+
+#     api_token = os.getenv("AUDD_TOKEN")
+
+#     with open(file_path, 'rb') as audio_file:
+#         files = {
+#             'file': audio_file,
+#         }
+#         data = {
+#             'api_token': api_token,
+#             'return': 'apple_music,spotify',  # tu peux enlever si tu veux moins de données
+#         }
+
+#         response = requests.post(url, data=data, files=files)
+    
+#     if response.status_code == 200:
+#         result = response.json()
+#         if result.get("status") == "success" and result.get("result"):
+#             title = result["result"].get("title")
+#             artist = result["result"].get("artist")
+#             return {"title": title, "artist": artist}
+#         else:
+#             return {"error": "Musique non reconnue."}
+#     else:
+#         return {"error": f"Erreur API: {response.status_code} - {response.text}"}
+    
+
+# def get_lyrics(data: dict):
+#     title = data.get("title")
+#     artist = data.get("artist")
+
+#     if not title or not artist:
+#         raise HTTPException(status_code=400, detail="Title and artist are required")
+
+#     base_url = "https://api.lyrics.ovh/v1"
+#     url = f"{base_url}/{artist}/{title}"
+
+#     response = requests.get(url)
+
+#     if response.status_code == 200:
+#         lyrics_data = response.json()
+#         return {"lyrics": lyrics_data.get("lyrics", "No lyrics found.")}
+#     else:
+#         raise HTTPException(status_code=404, detail="Lyrics not found.")
+    
+
+# async def play_lyrics_blocks(lyrics_data: dict, topic: str):
+#     lyrics = lyrics_data.get("lyrics", "")
+    
+#     # Découpage des paroles en phrases (chaque ligne non vide ou bloc de texte)
+#     blocks = [line.strip() for line in re.split(r'\r?\n+', lyrics) if line.strip()]
+    
+
+#     for i, block in enumerate(blocks, 1):
+#         payload = {
+#             "FLAG": "LYRICS_BLOCK",
+#             "index": i,
+#             "text": block
+#         }
+#         publish(topic, payload)
+#         print(f"Bloc {i} envoyé : {block}")
+#         await asyncio.sleep(3)
+
+#     # Message de fin
+#     publish(topic, {"FLAG": "LYRICS_STOP"})
+#     print("🎉 Tous les lyrics ont été envoyés !")
+
+
+# @router.post("/lyrics/play")
+# async def play_lyrics(data: LyricsModel, current_user = Depends(get_current_user)):
+#     global playing_lyrics
+
+#     # Stoppe la tâche précédente si elle existe
+#     if playing_lyrics is not None and not playing_lyrics.done():
+#         playing_lyrics.cancel()
+#         try:
+#             await playing_lyrics
+#         except asyncio.CancelledError:
+#             print("Ancienne tâche annulée")
+
+#     payload = { "FLAG": "LYRICS_PLAY", **data.dict() }
+#     publish(MQTT_TOPIC, payload)
+
+#     # Enregistrement Audio de 5sec pour l'envoyer à API Reconnaissance Musicale
+#     # audio_file = await record_and_get_path(durée=10)
+#     # if audio_file != 0:
+#     #     print("Fichier Audio créer et enregistré !")
+
+#     # Envoyer le Son à l'API AudD et récupérer Titre + Artiste
+#     # meta_data = recognize_music_with_audd(audio_file)
+#     # print(f"Titre et Artiste reconnu par AudD : {meta_data}")
+
+#     # chanson1 = {'title': "La vie qu'on mène", 'artist': 'Ninho'}
+
+#     # Récupération des Paroles de la chanson détectée
+#     # lyrics_data = get_lyrics(meta_data)
+#     lyrics_data = {'lyrics': "No me importa lo que de mí se diga\r\nVida usted su vida, que yo vivo la mia\r\nQue solo es una, disfruta el momento\r\nQue el tiempo se acaba y pa'trás no vira\r\nBebiendo, fumando y jodiendo\n\nSigo vacilando de party to' los día'\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (¡Farru!)\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (La rola y pepa)\n\n\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\n\n\nDesacata'o\n\nEmpastilla'o\n\n(Qué maldita nota)\n\n(Arcoíris)\n\n¡Fa-Farru!\n\n\n\n"}
+#     print(f"Les Lyrics du son capté : {lyrics_data}")
+
+#     # Découpage et envoie des Paroles par blocs via MQTT
+#     playing_lyrics = asyncio.create_task(play_lyrics_blocks(lyrics_data, MQTT_TOPIC))
+
+#     return {"status": "ok"}
+
+# @router.post("/lyrics/stop")
+# async def stop_lyrics(current_user = Depends(get_current_user)):
+#     global playing_lyrics
+
+#     if playing_lyrics is not None and not playing_lyrics.done():
+#         playing_lyrics.cancel()
+#         try:
+#             await playing_lyrics
+#         except asyncio.CancelledError:
+#             print("Tâche lyrics annulée")
+
+#     publish(MQTT_TOPIC, { "FLAG": "LYRICS_STOP" })
+#     return {"status": "ok"}
+
 UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
 UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
 
-AUDIO_PATH = UPLOAD_DIR_LYRICS / "test.wav"
+LRC_PATH = UPLOAD_DIR_LYRICS / "jetemmeneauvent_lyrics.lrc"
 
 playing_lyrics: Union[asyncio.Task, None] = None
 
-async def record_and_get_path(durée: int = 15) -> Path:
-    # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
-    # cmd = [
-    #     "arecord",
-    #     "-D", "plughw:1,0",        # adapte à ton device
-    #     "-f", "cd",
-    #     "-t", "wav",
-    #     "-d", str(durée),
-    #     str(AUDIO_PATH)
-    # ]
-    # subprocess.run(cmd, check=True)
-    # return AUDIO_PATH
-
-    sample_rate = 44100  # Qualité CD
-    print(f"📢 Enregistrement audio de {durée} secondes...")
-    audio = sd.rec(int(durée * sample_rate), samplerate=sample_rate, channels=2)
-    sd.wait()  # Attend la fin de l'enregistrement
-    write(str(AUDIO_PATH), sample_rate, audio)
-    return AUDIO_PATH
-
-
-def recognize_music_with_audd(file_path: str) -> dict:
+def parse_lrc(path: Path) -> list[tuple[float, str]]:
     """
-    Envoie un fichier audio à l'API AudD pour reconnaissance musicale.
-    
-    Args:
-        file_path (str): Chemin vers le fichier audio.
-        api_token (str): Clé API AudD.
-
-    Returns:
-        dict: Dictionnaire contenant l'artiste, le titre, ou une erreur.
+    Lit un fichier .lrc et renvoie une liste triée de (timestamp_en_secondes, texte).
     """
-    url = "https://api.audd.io/"
+    pattern = re.compile(r'^\[(\d{2}):(\d{2}\.\d{2})\](.*)$')
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = pattern.match(line)
+        if m:
+            minutes = int(m.group(1))
+            seconds = float(m.group(2))
+            text = m.group(3).strip()
+            entries.append((minutes * 60 + seconds, text))
+    # Assure l’ordre croissant
+    return sorted(entries, key=lambda x: x[0])
 
-    load_dotenv()  # lit ton .env
+async def play_lyrics_from_lrc(topic: str):
+    """
+    Parcourt les entrées (timestamp, text) et publie chaque text au bon moment.
+    """
+    sync_map = parse_lrc(LRC_PATH)
+    start = asyncio.get_event_loop().time()
 
-    api_token = os.getenv("AUDD_TOKEN")
+    for ts, text in sync_map:
+        # Attendre jusqu’au timestamp relatif
+        now = asyncio.get_event_loop().time()
+        delay = (start + ts) - now
+        if delay > 0:
+            await asyncio.sleep(delay)
 
-    with open(file_path, 'rb') as audio_file:
-        files = {
-            'file': audio_file,
-        }
-        data = {
-            'api_token': api_token,
-            'return': 'apple_music,spotify',  # tu peux enlever si tu veux moins de données
-        }
-
-        response = requests.post(url, data=data, files=files)
-    
-    if response.status_code == 200:
-        result = response.json()
-        if result.get("status") == "success" and result.get("result"):
-            title = result["result"].get("title")
-            artist = result["result"].get("artist")
-            return {"title": title, "artist": artist}
-        else:
-            return {"error": "Musique non reconnue."}
-    else:
-        return {"error": f"Erreur API: {response.status_code} - {response.text}"}
-    
-
-def get_lyrics(data: dict):
-    title = data.get("title")
-    artist = data.get("artist")
-
-    if not title or not artist:
-        raise HTTPException(status_code=400, detail="Title and artist are required")
-
-    base_url = "https://api.lyrics.ovh/v1"
-    url = f"{base_url}/{artist}/{title}"
-
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        lyrics_data = response.json()
-        return {"lyrics": lyrics_data.get("lyrics", "No lyrics found.")}
-    else:
-        raise HTTPException(status_code=404, detail="Lyrics not found.")
-    
-
-async def play_lyrics_blocks(lyrics_data: dict, topic: str):
-    lyrics = lyrics_data.get("lyrics", "")
-    
-    # Découpage des paroles en phrases (chaque ligne non vide ou bloc de texte)
-    blocks = [line.strip() for line in re.split(r'\r?\n+', lyrics) if line.strip()]
-    
-
-    for i, block in enumerate(blocks, 1):
         payload = {
             "FLAG": "LYRICS_BLOCK",
-            "index": i,
-            "text": block
+            "time": ts,
+            "text": text
         }
         publish(topic, payload)
-        print(f"Bloc {i} envoyé : {block}")
-        await asyncio.sleep(3)
+        print(f"[{ts:06.2f}] → {text}")
 
-    # Message de fin
+    # Fin de lecture
     publish(topic, {"FLAG": "LYRICS_STOP"})
-    print("🎉 Tous les lyrics ont été envoyés !")
-
+    print("🎉 Lecture terminée")
 
 @router.post("/lyrics/play")
-async def play_lyrics(data: LyricsModel, current_user = Depends(get_current_user)):
+async def play_lyrics(data: LyricsModel, current_user=Depends(get_current_user)):
     global playing_lyrics
 
-    # Stoppe la tâche précédente si elle existe
-    if playing_lyrics is not None and not playing_lyrics.done():
+    # Si une tâche est déjà en cours, on l’annule
+    if playing_lyrics and not playing_lyrics.done():
         playing_lyrics.cancel()
         try:
             await playing_lyrics
         except asyncio.CancelledError:
-            print("Ancienne tâche annulée")
+            print("✂️ Ancienne tâche annulée")
 
-    payload = { "FLAG": "LYRICS_PLAY", **data.dict() }
-    publish(MQTT_TOPIC, payload)
+    # Indique au client qu’on démarre
+    publish(MQTT_TOPIC, {"FLAG": "LYRICS_PLAY", **data.dict()})
+    print("▶️ Démarrage de la lecture des lyrics")
 
-    # Enregistrement Audio de 5sec pour l'envoyer à API Reconnaissance Musicale
-    # audio_file = await record_and_get_path(durée=10)
-    # if audio_file != 0:
-    #     print("Fichier Audio créer et enregistré !")
+    # Lance la playback task
+    playing_lyrics = asyncio.create_task(play_lyrics_from_lrc(MQTT_TOPIC))
 
-    # Envoyer le Son à l'API AudD et récupérer Titre + Artiste
-    # meta_data = recognize_music_with_audd(audio_file)
-    # print(f"Titre et Artiste reconnu par AudD : {meta_data}")
-
-    # chanson1 = {'title': "La vie qu'on mène", 'artist': 'Ninho'}
-
-    # Récupération des Paroles de la chanson détectée
-    # lyrics_data = get_lyrics(meta_data)
-    lyrics_data = {'lyrics': "No me importa lo que de mí se diga\r\nVida usted su vida, que yo vivo la mia\r\nQue solo es una, disfruta el momento\r\nQue el tiempo se acaba y pa'trás no vira\r\nBebiendo, fumando y jodiendo\n\nSigo vacilando de party to' los día'\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (¡Farru!)\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (La rola y pepa)\n\n\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\n\n\nDesacata'o\n\nEmpastilla'o\n\n(Qué maldita nota)\n\n(Arcoíris)\n\n¡Fa-Farru!\n\n\n\n"}
-    print(f"Les Lyrics du son capté : {lyrics_data}")
-
-    # Découpage et envoie des Paroles par blocs via MQTT
-    playing_lyrics = asyncio.create_task(play_lyrics_blocks(lyrics_data, MQTT_TOPIC))
-
-    return {"status": "ok"}
+    return {"status": "ok", "message": "Lecture lancée, calée sur le LRC"}
 
 @router.post("/lyrics/stop")
-async def stop_lyrics(current_user = Depends(get_current_user)):
+async def stop_lyrics(current_user=Depends(get_current_user)):
     global playing_lyrics
 
-    if playing_lyrics is not None and not playing_lyrics.done():
+    if playing_lyrics and not playing_lyrics.done():
         playing_lyrics.cancel()
         try:
             await playing_lyrics
         except asyncio.CancelledError:
-            print("Tâche lyrics annulée")
+            print("✂️ Tâche lyrics annulée")
 
-    publish(MQTT_TOPIC, { "FLAG": "LYRICS_STOP" })
-    return {"status": "ok"}
+    publish(MQTT_TOPIC, {"FLAG": "LYRICS_STOP"})
+    print("⏹️ Lecture stoppée")
+    return {"status": "ok", "message": "Lecture stoppée"}
 
 
 # ######################################## ADS #########################################
