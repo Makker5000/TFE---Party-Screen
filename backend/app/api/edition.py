@@ -243,6 +243,8 @@ async def play_visual(req: dict, db: Session = Depends(get_db), current_user = D
     # ─── 2) On construit le payload MQTT pour l’image
     payload = {
         "FLAG": "VISUAL_PLAY",
+        "width": 48,
+        "height": 48,
         "picture": visual_row.data_base64
     }
     publish(MQTT_TOPIC, payload)
