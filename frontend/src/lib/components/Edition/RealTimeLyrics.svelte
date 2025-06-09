@@ -34,6 +34,7 @@
 
   onMount(async () => {
     token = localStorage.getItem('token') ?? '';
+    // active = data.state === 'play';
   });
 
   function openSavePresetModal() {
@@ -78,7 +79,7 @@
   async function toggleLyrics() {
 
     const nextState = active ? 'play' : 'stop';
-   data = { ...data, state: nextState };
+    data = { ...data, state: nextState };
 
     if (!active) {
       // const config = { textColor, backgroundColor, font, animation };

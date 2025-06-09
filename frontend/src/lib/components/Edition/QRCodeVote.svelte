@@ -34,6 +34,7 @@
 
   onMount(async () => {
     token = localStorage.getItem('token') ?? '';
+    // active = data.state === 'play';
   });
 
   function openSavePresetModal() {

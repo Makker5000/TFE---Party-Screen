@@ -704,6 +704,7 @@ async def stop_lyrics(current_user=Depends(get_current_user)):
 async def play_ads(data: AdsModel):
     if data.state == "play":
         print(f"Contenu du message : {data.content}")
+        print(f"State = {data.state}")
         payload = { "FLAG": "ADS_PLAY", **data.dict() } # Faire en sorte d'exclure la balise 'state' !
         publish(MQTT_TOPIC, payload)
     else:
@@ -714,7 +715,8 @@ async def play_ads(data: AdsModel):
 async def stop_ads(data: AdsModel):
     if data.state == "stop":
         print(f"Arrêt de l'affichage du message : {data.content} !!")
+        print(f"State = {data.state}")
         publish(MQTT_TOPIC, { "FLAG": "ADS_STOP" })
     else:
-        print("Erreur lors de la condition ! Pas le bon état pour STOP !")
+        print(f"Erreur lors de la condition ! Pas le bon état pour STOP ! State = {data.state}")
     return {"status": "ok"}

@@ -23,7 +23,7 @@
     animation: string;
     speed: number;
     content: string;
-    state: string;
+    state: 'play' | 'stop'; 
   } = {
     textColor: textColor,
     backgroundColor: backgroundColor,
@@ -31,7 +31,7 @@
     animation: animation,
     speed: speed,
     content: content,
-    state: active ? 'stop' : 'play',
+    state: 'play',
   };
   export let editMode: boolean = false;
   let showModal = false;
@@ -40,6 +40,7 @@
 
   onMount(async () => {
     token = localStorage.getItem('token') ?? '';
+    // active = data.state === 'stop';
   });
 
 
@@ -67,7 +68,9 @@
 
   async function toggleAds() {
     // const config = { ...data, state: active ? 'stop' : 'play' };
-    const config = { ...data };
+    const nextState = active ? 'stop' : 'play';
+    data = { ...data, state: nextState };
+    // const config = { ...data };
     // const url = active ? 'http://localhost:8000/api/edition/ads/stop' : 'http://localhost:8000/api/edition/ads/play';
     const url = active ? '/api/edition/ads/stop' : '/api/edition/ads/play';
     await fetch(url, {
@@ -76,7 +79,7 @@
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(config)
+      body: JSON.stringify(data)
     });
     active = !active;
   }
