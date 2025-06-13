@@ -20,7 +20,7 @@
             },
           }]
         },
-        plugins: [daisyui],
+        plugins: [require(daisyui)],
       };
     </script>
     <!-- DaisyUI -->
@@ -29,6 +29,9 @@
     %sveltekit.head%
   </head>
   <body class="bg-base-100 text-neutral">
-    %sveltekit.body%
+    <!-- %sveltekit.body% -->
+    <div style="display: contents">
+        %sveltekit.body%
+    </div>
   </body>
 </html>
