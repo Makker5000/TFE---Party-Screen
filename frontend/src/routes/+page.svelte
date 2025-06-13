@@ -34,7 +34,8 @@
       return stored;
     }
 
-    const response = await fetch('http://localhost:8000/api/login', {
+    // const response = await fetch('http://localhost:8000/api/login', {
+    const response = await fetch('/api/login', {
       method: 'POST'
     });
     if (!response.ok) throw new Error('Login failed');
@@ -48,7 +49,8 @@
     try {
       token = await getOrRefreshToken();
 
-      const res = await fetch('http://localhost:8000/api/tracks', {
+      // const res = await fetch('http://localhost:8000/api/tracks', {
+      const res = await fetch('/api/tracks', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -64,7 +66,8 @@
 
   async function vote(id: number) {
     try {
-      const res = await fetch(`http://localhost:8000/api/vote/${id}`, {
+      // const res = await fetch(`http://localhost:8000/api/vote/${id}`, {
+      const res = await fetch(`/api/vote/${id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
