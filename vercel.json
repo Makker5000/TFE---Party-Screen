@@ -1,0 +1,17 @@
+{
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/backend/$1" },
+    { "src": "/(.*)", "dest": "/frontend/$1" }
+  ],
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "frontend/.svelte-kit/output/client" }
+    },
+    {
+      "src": "backend/requirements.txt",
+      "use": "@vercel/python"
+    }
+  ]
+}
