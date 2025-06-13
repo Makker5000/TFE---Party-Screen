@@ -1,5 +1,6 @@
 <!-- Last version -->
 <script lang="ts">
+    import { API_URL } from '$lib/api';
   import { onMount } from 'svelte';
 
   type Track = {
@@ -33,9 +34,10 @@
     if (stored && isTokenValid(stored)) {
       return stored;
     }
+    console.log("API_URL : ", API_URL);
 
     // const response = await fetch('http://localhost:8000/api/login', {
-    const response = await fetch('/api/login', {
+    const response = await fetch(`${API_URL}/api/login`, {
       method: 'POST'
     });
     if (!response.ok) throw new Error('Login failed');
@@ -50,7 +52,7 @@
       token = await getOrRefreshToken();
 
       // const res = await fetch('http://localhost:8000/api/tracks', {
-      const res = await fetch('/api/tracks', {
+      const res = await fetch(`${API_URL}/api/tracks`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -67,14 +69,14 @@
   async function vote(id: number) {
     try {
       // const res = await fetch(`http://localhost:8000/api/vote/${id}`, {
-      const res = await fetch(`/api/vote/${id}`, {
+      const res = await fetch(`${API_URL}/api/vote/${id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
       });
       // const res = await fetch(`/api/vote/${id}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Vote refusé');
+      if (!res.ok) throw new Error('Limite de 3 votes atteinte');
       tracks = tracks.map(t =>
         t.track_id === id ? { ...t, votes: t.votes + 1 } : t
       );
