@@ -12,6 +12,20 @@
 
   let token: string;
 
+  let showToast = false;
+  let toastMessage = '';
+  let toastType = '';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
+
   onMount(() => {
     token = localStorage.getItem('token');
     if (!token || isTokenExpired(token)) {
@@ -64,10 +78,16 @@
         alert(data.message);
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error while changing name";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert(`Username mis à jour : ${username}`);
+    toastMessage = "Username changed successfully";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function updatePassword(currentPassword: string, newPassword: string) {
@@ -95,10 +115,16 @@
         alert(data.message);
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error while changing password";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert(`Mot de passe mis à jour : ${password}`);
+    toastMessage = "Password changed successfully";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function createAccount(username: string, email: string, password: string) {
@@ -121,10 +147,13 @@
         const data = await res.json();
 
         if (!res.ok) {
-            throw new Error(data.detail || 'Erreur lors de l\'inscription');
+            // throw new Error(data.detail || 'Erreur lors de l\'inscription');
+            toastMessage = "Error during registration";
+            toastType = 'error';
+            triggerToast(toastMessage, toastType);
         }
 
-        alert(data.message);
+        // alert(data.message);
         // Rediriger vers login si tout va bien
         window.location.href = '/login';
     } catch (err) {
@@ -156,10 +185,16 @@
         window.location.href = '/login';
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error during log out";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert('Déconnexion effectuée');
+    toastMessage = "Log out successful";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function deleteAccount() {
@@ -168,7 +203,7 @@
     //   alert('Compte supprimé');
     // }
 
-    if (!confirm("Es-tu sûr de vouloir supprimer ton compte ?")) return;
+    if (!confirm("Are you sure you want to delete your account ?")) return;
 
     try {
         // const res = await fetch('http://localhost:8000/api/users/delete', {
@@ -181,7 +216,10 @@
 
         if (!res.ok) {
             const data = await res.json();
-            throw new Error(data.detail || 'Erreur lors de la suppression');
+            // throw new Error(data.detail || 'Erreur lors de la suppression');
+            toastMessage = "Error deleting";
+            toastType = 'error';
+            triggerToast(toastMessage, toastType);
         }
 
         const data = await res.json();

@@ -1,6 +1,8 @@
 <script lang="ts">
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
     import { onMount } from 'svelte';
+    import AlertModal from '../modals/AlertModal.svelte';
+    import Toast from '../modals/Toast.svelte';
 
   let url = '';
   let defaultUrl = 'https://tfe-twampi.vercel.app/';
@@ -30,11 +32,70 @@
     state: 'play'
   }; 
 
+  // Variables pour récup la config de l'écran actuel
+  let screenCount: number = 1;
+  let matrixCount: number = 4;
+  let screenShape: string = "Square";
+
+  // Liste des 4 combinaisons autorisées
+  const validCombos: [number, number, string][] = [
+    [1, 9, "Square"],
+  ];
+
   let token: string;
+
+  let showAlertModal = false;
+  let alertTitle: string;
+  let alertMessage: string;
+
+  let showToast = false;
+  let toastMessage = '';
+  let toastType = '';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
+
+  function triggerAlert() {
+    showAlertModal = true;
+  }
+
+  function closeModal() {
+    showAlertModal = false;
+  }
 
   onMount(async () => {
     token = localStorage.getItem('token') ?? '';
     // active = data.state === 'play';
+
+    try {
+      // const res = await fetch('http://localhost:8000/api/settings/config', { 
+      const res = await fetch('/api/settings/config', { 
+        method: 'GET',
+        headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // à adapter selon ta gestion
+            }
+       });
+      // const res = await fetch('/api/settings/config', { method: 'GET' });
+      if (!res.ok) {
+        console.error('Impossible de charger les settings (status ' + res.status + ')');
+        return;
+      }
+      const json = await res.json();
+      screenCount = json.screenCount;
+      matrixCount = json.matrixCount;
+      screenShape = json.screenShape;
+      console.log("Settings récupérés :", screenCount, matrixCount, screenShape);
+    } catch (e) {
+      console.error("Erreur réseau lors de la récupération des settings :", e);
+    }
   });
 
   function openSavePresetModal() {
@@ -75,10 +136,30 @@
     showModal = false;
   }
 
+  function isCurrentConfigValid(): boolean {
+    return validCombos.some(
+      ([sc, mc, shape]) =>
+        sc === screenCount && mc === matrixCount && shape === screenShape
+    );
+  }
+
   async function generateQRCode() {
     currentUrl = data.url;
     if (!currentUrl) {
-      alert('Veuillez saisir une URL.');
+      // alert('Veuillez saisir une URL.');
+      alertTitle = "Warning";
+      alertMessage = "Please enter a URL ! ";
+      triggerAlert();
+      return;
+    }
+
+    if (!isCurrentConfigValid()) {
+      alertTitle = "Invalid config !";
+      alertMessage = "Your screen settings (" +
+          `screenCount=${screenCount}, matrixCount=${matrixCount}, screenShape='${screenShape}'` +
+          `) are not part of the authorized combinations :\n` +
+          "• (1, 9, 'Square')\n";
+      triggerAlert();
       return;
     }
     
@@ -118,7 +199,10 @@
       
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la génération du QR Code');
+      // alert('Erreur lors de la génération du QR Code');
+      toastMessage = "Error while generating QR Code...";
+      toastType = 'error';
+      triggerToast(toastMessage, toastType);
     } finally {
       isLoading = false;
     }
@@ -152,11 +236,17 @@
           active = true;
         } catch (err) {
           console.error('Erreur Play QR:', err);
-          alert('Erreur lors du play du QR Code : ' + err);
+          // alert('Erreur lors du play du QR Code : ' + err);
+          toastMessage = "Error while playing QR Code : " + err;
+          toastType = 'error';
+          triggerToast(toastMessage, toastType);
         }
         return;
       } else {
-        alert('Impossible de jouer : ni QR généré ni URL fournie.');
+        // alert('Impossible de jouer : ni QR généré ni URL fournie.');
+        toastMessage = "Unable to play : No QR generated or URL provided.";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
         return;
       }
     }
@@ -188,7 +278,10 @@
       qrId = null;
     } catch (err) {
       console.error('Erreur toggle QR :', err);
-      alert('Erreur lors du ' + (active ? 'stop' : 'play') + ' du QR : ' + err);
+      // alert('Erreur lors du ' + (active ? 'stop' : 'play') + ' du QR : ' + err);
+      toastMessage = "Error during state '" + (active ? 'stop' : 'play') + "' of QR : " + err;
+      toastType = 'error';
+      triggerToast(toastMessage, toastType);
     }
   }
 
@@ -258,4 +351,18 @@
       on:cancel={() => (showModal = false)}
     />
   {/if}
+
+  <AlertModal
+    show={showAlertModal}
+    title={alertTitle}
+    message={alertMessage}
+    onClose={closeModal}
+  />
+
+  <Toast
+    show={showToast}
+    message={toastMessage}
+    type={toastType}
+    onClose={closeToast}
+  />
 </div>

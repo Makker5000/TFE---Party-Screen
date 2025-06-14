@@ -2,6 +2,7 @@
   import { writable } from 'svelte/store';
   import { onMount } from 'svelte';
   import { isTokenExpired } from '$lib/utils/jwt';
+    import Toast from '$lib/components/modals/Toast.svelte';
 
   export let power = false;
   export let screenCount = '';
@@ -11,6 +12,20 @@
   export const screenShapes = ["Square", "Line", "Horizontal Rectangle", "Vertical Rectangle"];
 
   let token: string;
+
+  let showToast = false;
+  let toastMessage = 'Settings update successful !';
+  let toastType = 'success';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
 
   // Au montage, on récupère l'état courant côté backend
   onMount(async () => {
@@ -83,7 +98,9 @@
        },
       body: JSON.stringify(payload)
     });
-    alert("Paramètres écran bien mis à jour !")
+    // alert("Paramètres écran bien mis à jour !")
+    // triggerAlert();
+    triggerToast(toastMessage, toastType);
   }
 </script>
 
@@ -116,8 +133,8 @@
         <h2 class="card-title">Number of Screens</h2>
         <input
           type="number"
-          min="0"
-          max="10"
+          min="1"
+          max="2"
           bind:value={screenCount}
           class="input input-bordered w-full"
         />
@@ -130,7 +147,7 @@
         <h2 class="card-title">Number of Matrix</h2>
         <input
           type="number"
-          min="0"
+          min="2"
           max="10"
           bind:value={matrixCount}
           disabled={!screenCount || Number(screenCount) === 0}
@@ -163,5 +180,12 @@
     >
       Apply Settings
     </button>
+
+    <Toast
+      show={showToast}
+      message={toastMessage}
+      type={toastType}
+      onClose={closeToast}
+    />
   </div>
 </div>

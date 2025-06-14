@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import SavePresetModal from '$lib/components/modals/SavePresetModal.svelte';
+    import AlertModal from '../modals/AlertModal.svelte';
+    import Toast from '../modals/Toast.svelte';
 
   let token: string;
 
@@ -26,6 +28,32 @@
     [1, 6, "Horizontal Rectangle"],
     [1, 6, "Vertical Rectangle"]
   ];
+
+   let showAlertModal = false;
+   let alertTitle: string;
+   let alertMessage: string;
+
+  let showToast = false;
+  let toastMessage = '';
+  let toastType = '';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
+
+  function triggerAlert() {
+    showAlertModal = true;
+  }
+
+  function closeModal() {
+    showAlertModal = false;
+  }
 
   // On va récup au montage la config de l'écran
   onMount(async () => {
@@ -61,7 +89,11 @@
 
   async function handleSavePreset(presetName: string) {
     if (!uploadedFilename) {
-      return alert("Vous devez d’abord uploader une image avant de sauvegarder le preset.");
+      // return alert("Vous devez d’abord uploader une image avant de sauvegarder le preset.");
+      alertTitle = "Warning";
+      alertMessage = "You have to upload a picture before saving preset ! ";
+      triggerAlert();
+      return;
     }
 
     const presetData = {
@@ -111,21 +143,26 @@
   async function toggleVisual() {
     // Si on est en train de lancer et qu’il n’y a pas de fichier, on bloque
     if (!active && !file) {
-      return alert("Veuillez choisir un fichier avant de lancer la lecture.");
+      // return alert("Veuillez choisir un fichier avant de lancer la lecture.");
+      alertTitle = "Warning";
+      alertMessage = "You have to upload a picture before playing preset ! ";
+      triggerAlert();
+      return;
     }
 
     if (!active) {
       // On vérifie la config et si elle est bonne alors on upload et traite l'image
       if (!isCurrentConfigValid()) {
-        return alert(
-          "Configuration invalide pour l'upload ! Vos réglages d'écran (" +
+        alertTitle = "Invalid config !";
+        alertMessage = "Your screen settings (" +
             `screenCount=${screenCount}, matrixCount=${matrixCount}, screenShape='${screenShape}'` +
-            `) ne font pas partie des combinaisons autorisées :\n` +
+            `) are not part of the authorized combinations :\n` +
             "• (1, 4, 'Square')\n" +
             "• (1, 9, 'Square')\n" +
             "• (1, 6, 'Horizontal Rectangle')\n" +
-            "• (1, 6, 'Vertical Rectangle')"
-        );
+            "• (1, 6, 'Vertical Rectangle')";
+        triggerAlert();
+        return;
       }
 
       // === 1) Upload d’abord le fichier vers /upload ===
@@ -144,12 +181,20 @@
         });
       } catch (e) {
         console.error('Erreur réseau lors de l\'upload :', e);
-        return alert('Échec de l’upload.');
+        // return alert('Échec de l’upload.');
+        toastMessage = "Upload failed";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
+        return;
       }
 
       if (!uploadResponse.ok) {
         console.error('Réponse non-ok de /upload', await uploadResponse.text());
-        return alert('Échec de l’upload (status ' + uploadResponse.status + ').');
+        // return alert('Échec de l’upload (status ' + uploadResponse.status + ').');
+        toastMessage = "Upload failed (status " + uploadResponse.status + ").";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
+        return;
       }
 
       const uploadJson = await uploadResponse.json();
@@ -171,14 +216,22 @@
 
         if (!playResponse.ok) {
           console.error('Réponse non-ok de /play', await playResponse.text());
-          return alert('Échec du Play (status ' + playResponse.status + ').');
+          // return alert('Échec du Play (status ' + playResponse.status + ').');
+          toastMessage = "Play failure (status " + uploadResponse.status + ").";
+          toastType = 'error';
+          triggerToast(toastMessage, toastType);
+          return;
         }
 
         const playJson = await playResponse.json();
         console.log('Play command envoyé →', playJson);
       } catch (e) {
         console.error('Erreur réseau lors de /play :', e);
-        return alert('Échec de la commande Play.');
+        // return alert('Échec de la commande Play.');
+        toastMessage = "Play command failed";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
+        return;
       }
 
       // Passe en mode actif
@@ -197,14 +250,22 @@
 
         if (!stopResponse.ok) {
           console.error('Réponse non-ok de /stop', await stopResponse.text());
-          return alert('Échec du Stop (status ' + stopResponse.status + ').');
+          // return alert('Échec du Stop (status ' + stopResponse.status + ').');
+          toastMessage = "Stop failure (status " + stopResponse.status + ").";
+          toastType = 'error';
+          triggerToast(toastMessage, toastType);
+          return;
         }
 
         const stopJson = await stopResponse.json();
         console.log('Stop command envoyé →', stopJson);
       } catch (e) {
         console.error('Erreur réseau lors de /stop :', e);
-        return alert('Échec de la commande Stop.');
+        // return alert('Échec de la commande Stop.');
+        toastMessage = "Stop command failed";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
+        return;
       }
 
       // On remet tout à zéro
@@ -252,5 +313,19 @@
     open={showModal}
     on:save={(e) => handleSavePreset(e.detail)}
     on:cancel={() => (showModal = false)}
+  />
+
+  <AlertModal
+    show={showAlertModal}
+    title={alertTitle}
+    message={alertMessage}
+    onClose={closeModal}
+  />
+
+  <Toast
+    show={showToast}
+    message={toastMessage}
+    type={toastType}
+    onClose={closeToast}
   />
 </div>
