@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isTokenExpired } from '$lib/utils/jwt';
   import { onMount } from 'svelte';
 
   let username = '';
@@ -12,8 +13,34 @@
   let token: string;
 
   onMount(() => {
-    token = localStorage.getItem('token') ?? '';
+    token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
+    getCurrentUser();
   });
+
+  async function getCurrentUser() {
+    try {
+      // const res = await fetch('http://localhost:8000/api/users/myself', {
+      const res = await fetch('/api/users/myself', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la récupération de l'utilisateur");
+      }
+
+      const data = await res.json();
+      username = data.username;
+    } catch (err) {
+      console.error(err);
+    }
+  }
   
   async function updateUsername(newUsername: string) {
     // Appel API ou logique de mise à jour
@@ -174,9 +201,10 @@
 </svelte:head>
 
 <div class="min-h-screen bg-pink-50 flex flex-col items-center py-8 px-4">
-  <h1 class="text-center text-black text-4xl font-bold mb-8">Account</h1>
+  <h1 class="text-center text-black text-4xl font-bold mb-4">Account</h1>
+  <h2 class="text-center text-black text-lg font-medium mb-4 animate-slide-in">Bonjour <span class="text-blue-500 font-semibold">{username}</span> !</h2>
 
-  <div class="w-full max-w-md space-y-6">
+  <div class="w-full max-w-md space-y-6 mt-0">
 
     <!-- Modifier Username -->
     <div class="card bg-base-100 shadow-md mx-auto">
@@ -188,7 +216,7 @@
           bind:value={newUsername}
           class="input input-bordered w-full"
         />
-        <button class="btn btn-primary mt-4" on:click={() => updateUsername(username)}>Update</button>
+        <button class="btn btn-primary mt-4" on:click={() => updateUsername(newUsername)}>Update</button>
       </div>
     </div>
 

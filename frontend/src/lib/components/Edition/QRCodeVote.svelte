@@ -3,7 +3,7 @@
     import { onMount } from 'svelte';
 
   let url = '';
-  let defaultUrl = 'http://localhost:5173/lyrics';
+  let defaultUrl = 'https://tfe-twampi.vercel.app/';
 
   let currentUrl = url || defaultUrl;
   
@@ -20,14 +20,14 @@
   let active = false;
   let showModal = false;
 
-  let state = active ? 'stop' : 'play';
+  let state = active ? 'play' : 'stop';
 
   export let data: {
     url: string;
     state: string;
   } = {
     url: currentUrl,
-    state: state
+    state: 'play'
   }; 
 
   let token: string;
@@ -107,11 +107,12 @@
         throw new Error(detail);
       }
       
-      // NOUVEAU: Récupérer l'image du QR Code et le filename
+      // Récupérer l'image du QR Code et le filename
       const result = await response.json();
       qrImageSrc = result.image;
       qrGenerated = true;
       qrFilename = result.filename;
+      qrId = result.id;
       
       console.log('QR Code généré:', result);
       
@@ -184,6 +185,7 @@
         throw new Error(detail);
       }
       active = !active;
+      qrId = null;
     } catch (err) {
       console.error('Erreur toggle QR :', err);
       alert('Erreur lors du ' + (active ? 'stop' : 'play') + ' du QR : ' + err);
@@ -216,7 +218,7 @@
       {/if}
     </button>
 
-    <!-- NOUVEAU: Affichage du QR Code -->
+    <!-- Affichage du QR Code -->
     {#if qrGenerated && qrImageSrc}
       <div class="card bg-base-100 shadow-xl">
         <div class="card-body items-center text-center p-4">
@@ -244,6 +246,7 @@
       </button>
       <button 
         class="btn btn-outline btn-sm btn-lg hover:bg-blue-600 border-blue-200 hover:border-blue-600"
+        disabled={!qrGenerated}
         on:click={openSavePresetModal}
       >
         Save

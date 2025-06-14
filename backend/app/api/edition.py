@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.utils.usersAuth import get_current_user
 from app.models.settings import SettingsDB
+from app.utils.normalize_accents import strip_accents
 
 router = APIRouter()
 
@@ -263,7 +264,7 @@ async def stop_visual(db: Session = Depends(get_db), current_user = Depends(get_
 
 
 # ################################### QRCODE ####################################
-DEFAULT_URL = "http://localhost:5173/lyrics"
+DEFAULT_URL = "https://tfe-twampi.vercel.app/"
 UPLOAD_DIR_QRCODE = "app/uploads/qrcodes"
 os.makedirs(UPLOAD_DIR_QRCODE, exist_ok=True)
 
@@ -446,6 +447,13 @@ async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
         # 1) Supprimer de la BD
         db.delete(qr_row)
         db.commit()
+    elif data.url:
+        qr_row = db.query(QrcodeDB) \
+                   .filter(QrcodeDB.user_id==current_user.id, QrcodeDB.url==data.url) \
+                   .first()
+        if qr_row:
+            db.delete(qr_row)
+            db.commit()
 
     # 2) Publier le FLAG stop
     payload = {"FLAG": "QR_STOP"}
@@ -651,11 +659,13 @@ async def play_lyrics_from_lrc(topic: str):
         delay = (start + ts) - now
         if delay > 0:
             await asyncio.sleep(delay)
+        
+        clean_lyrics = strip_accents(text)
 
         payload = {
             "FLAG": "LYRICS_BLOCK",
             "time": ts,
-            "text": text
+            "text": clean_lyrics
         }
         publish(topic, payload)
         print(f"[{ts:06.2f}] → {text}")
@@ -704,17 +714,25 @@ async def stop_lyrics(current_user=Depends(get_current_user)):
 # ######################################## ADS #########################################
 @router.post("/ads/play")
 async def play_ads(data: AdsModel):
+    if data.state != "play":
+        return {"status": "error", "detail": "Pas le bon état pour PLAY !"}
+    
     if data.state == "play":
         print(f"Contenu du message : {data.content}")
         print(f"State = {data.state}")
-        payload = { "FLAG": "ADS_PLAY", **data.dict() } # Faire en sorte d'exclure la balise 'state' !
+        clean_content = strip_accents(data.content)
+        payload = { "FLAG": "ADS_PLAY", **data.dict(), "content": clean_content } # Faire en sorte d'exclure la balise 'state' !
         publish(MQTT_TOPIC, payload)
+        print(f"Le payload du message envoyé : {payload}")
     else:
         return "Pas le bon état pour PLAY !"
     return {"status": "ok"}
 
 @router.post("/ads/stop")
 async def stop_ads(data: AdsModel):
+    if data.state != "stop":
+        return {"status": "error", "detail": "Pas le bon état pour STOP !"}
+    
     if data.state == "stop":
         print(f"Arrêt de l'affichage du message : {data.content} !!")
         print(f"State = {data.state}")

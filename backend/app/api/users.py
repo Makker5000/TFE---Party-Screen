@@ -99,3 +99,8 @@ def delete_user(db: Session = Depends(get_db), current_user: User = Depends(get_
 def logout():
     # À adapter selon ta gestion d'auth (JWT, sessions, cookies, etc.)
     return {"message": "Déconnecté"}
+
+# ----------- Get CurrentUser ------------
+@router.get("/myself")
+def myself(current_user: User = Depends(get_current_user)):
+    return {"username": current_user.username}

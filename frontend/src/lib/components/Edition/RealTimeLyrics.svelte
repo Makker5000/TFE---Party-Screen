@@ -84,7 +84,6 @@
     if (!active) {
       // const config = { textColor, backgroundColor, font, animation };
       const config = { ...data };
-      // const config = { ...data };
       // await fetch('http://localhost:8000/api/edition/lyrics/play', {
       await fetch('/api/edition/lyrics/play', {
         method: 'POST',
@@ -138,7 +137,7 @@
   <div class="flex flex-col items-start w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Font</span></label>
-    <select bind:value={data.font} class="select select-bordered w-full">
+    <select bind:value={data.font} class="select select-bordered w-full" disabled>
       {#each availableFonts as f}
         <option value={f}>{f}</option>
       {/each}
@@ -151,7 +150,7 @@
     <label class="label"><span class="label-text">Animation</span></label>
     <select bind:value={data.animation} class="select select-bordered w-full">
       {#each availableAnimations as a}
-        <option value={a}>{a}</option>
+        <option disabled={a == 'bounce'} value={a}>{a}</option>
       {/each}
     </select>
   </div>

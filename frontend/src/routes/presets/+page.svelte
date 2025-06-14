@@ -6,6 +6,7 @@
   import DisplayVisual from '$lib/components/Edition/DisplayVisual.svelte';
   import QRCodeVote from '$lib/components/Edition/QRCodeVote.svelte';
   import RealTimeLyrics from '$lib/components/Edition/RealTimeLyrics.svelte';
+  import { isTokenExpired } from '$lib/utils/jwt';
 
   interface Preset {
     id: number;
@@ -28,13 +29,25 @@
   };
 
   onMount(async () => {
-    token = localStorage.getItem('token') ?? '';
+    token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
   });
 
   async function loadPresets() {
     try {
-      // const res = await fetch('http://localhost:8000/api/presets');
-      const res = await fetch('/api/presets');
+      // const res = await fetch('http://localhost:8000/api/presets', {
+      const res = await fetch('/api/presets', {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+      // const res = await fetch('/api/presets');
       if (!res.ok) throw new Error('Failed to load presets');
       presets = await res.json();
     } catch (error) {

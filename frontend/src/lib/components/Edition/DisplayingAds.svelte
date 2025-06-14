@@ -8,7 +8,7 @@
   let animation = 'scroll_left';
   let speed = 1;
   let content = '';
-  let state = 'stop';
+  // let state = 'stop';
   let availableTextColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple'];
   let availableBgColors = ['white', 'red', 'green', 'blue', 'yellow', 'purple', 'black'];
   let availableFonts = ['Arial', 'Verdana'];
@@ -68,9 +68,9 @@
 
   async function toggleAds() {
     // const config = { ...data, state: active ? 'stop' : 'play' };
-    const nextState = active ? 'stop' : 'play';
+    const nextState = active ? 'play' : 'stop';
     data = { ...data, state: nextState };
-    // const config = { ...data };
+
     // const url = active ? 'http://localhost:8000/api/edition/ads/stop' : 'http://localhost:8000/api/edition/ads/play';
     const url = active ? '/api/edition/ads/stop' : '/api/edition/ads/play';
     await fetch(url, {
@@ -109,7 +109,7 @@
   <div class="w-full max-w-xs">
     <!-- svelte-ignore a11y_label_has_associated_control -->
     <label class="label"><span class="label-text">Font</span></label>
-    <select bind:value={data.font} class="select select-bordered w-full">
+    <select bind:value={data.font} class="select select-bordered w-full" disabled>
       {#each availableFonts as f}
         <option value={f}>{f}</option>
       {/each}
@@ -121,7 +121,7 @@
     <label class="label"><span class="label-text">Animation</span></label>
     <select bind:value={data.animation} class="select select-bordered w-full">
       {#each availableAnimations as a}
-        <option value={a}>{a}</option>
+        <option disabled={a == 'bounce'} value={a}>{a}</option>
       {/each}
     </select>
   </div>

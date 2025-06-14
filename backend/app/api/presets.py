@@ -143,11 +143,14 @@ router = APIRouter()
 
 # ─── 1) Lister tous les presets ───────────────────────────────────────────────────
 @router.get("/", response_model=List[PresetRead])
-def list_presets(db: Session = Depends(get_db)):
+def list_presets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Récupère tous les presets depuis la BDD et les renvoie.
     """
-    result = db.execute(select(Preset))
+    # result = db.execute(select(Preset))
+    result = db.execute(
+        select(Preset).where(Preset.user_id == current_user.id)
+    )
     presets = result.scalars().all()
     return presets
 

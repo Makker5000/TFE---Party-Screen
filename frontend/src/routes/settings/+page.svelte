@@ -1,6 +1,7 @@
 <script lang="ts">
   import { writable } from 'svelte/store';
   import { onMount } from 'svelte';
+  import { isTokenExpired } from '$lib/utils/jwt';
 
   export let power = false;
   export let screenCount = '';
@@ -13,7 +14,15 @@
 
   // Au montage, on récupère l'état courant côté backend
   onMount(async () => {
-    token = localStorage.getItem('token') ?? '';
+    // token = localStorage.getItem('token') ?? '';
+
+    // Vérification de la Session avec le Token
+    token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
 
     try {
       // const res = await fetch('http://localhost:8000/api/settings/power', { 

@@ -4,6 +4,18 @@
   import QRCodeVote from '$lib/components/Edition/QRCodeVote.svelte';
   import RealTimeLyrics from '$lib/components/Edition/RealTimeLyrics.svelte';
   import DisplayingAds from '$lib/components/Edition/DisplayingAds.svelte';
+  import { onMount } from 'svelte';
+  import { isTokenExpired } from '$lib/utils/jwt';
+
+  onMount(async () => {
+    // Vérification de la Session avec le Token
+    const token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
+  });
 </script>
 
 <svelte:head>
