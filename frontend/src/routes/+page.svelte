@@ -112,10 +112,10 @@
             class="btn border-2 border-blue-500 text-blue-500 bg-transparent hover:bg-blue-500 hover:text-white mb-2 w-32 transition-colors rounded-lg"
             on:click={() => vote(t.track_id)}
           >
-            Voter
+            Vote
           </button>
 
-          <span class="text-lg">Votes : {t.votes}</span>
+          <span class="text-lg">Counting votes : {t.votes}</span>
         </div>
       </div>
     {/each}
