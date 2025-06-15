@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import http
 import time
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from shazamio import Shazam
@@ -272,6 +273,11 @@ DEFAULT_URL = "https://tfe-twampi.vercel.app/"
 UPLOAD_DIR_QRCODE = "app/uploads/qrcodes"
 os.makedirs(UPLOAD_DIR_QRCODE, exist_ok=True)
 
+# URL de stats du serveur 2
+STATS_URL = "https://tfe-twampi-backend.onrender.com/api/stats"
+# Dictionnaire pour garder la trace des tasks par QR id
+stop_tasks: dict[int, asyncio.Task] = {}
+
 @router.post("/qrcode", status_code=status.HTTP_200_OK)
 async def generate_qrcode(data: QRCodeModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     # 1) On va chercher la config de l'écran et on Vérifie les conditions 
@@ -437,13 +443,54 @@ async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
     }
     publish(MQTT_TOPIC, payload)
 
+    # Fonction interne pour timer, stats et affichage puis stop
+    async def timer_and_stats(qr_id: int):
+        try:
+            await asyncio.sleep(5)
+            # Appel stats
+            # async with httpx.AsyncClient() as client:
+            #     resp = await client.get(STATS_URL)
+            #     resp.raise_for_status()
+            #     stats_data = resp.json()
+            resp = await asyncio.to_thread(requests.get, STATS_URL)
+            resp.raise_for_status()
+            stats_data = resp.json()
+            if stats_data:
+                top_title = max(stats_data.items(), key=lambda kv: kv[1])[0]
+                top_title_payload = AdsModel (
+                    FLAG = "ADS_PLAY",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = top_title,
+                    state = "play",
+                )
+                
+            # Puis stop automatique
+            publish(MQTT_TOPIC, {"FLAG": "QR_STOP"})
+            await play_ads(top_title_payload)
+        except asyncio.CancelledError:
+            # Task annulée : on ne fait rien
+            return
+        finally:
+            # Nettoyer la tâche
+            stop_tasks.pop(qr_id, None)
+
+    # Lancer la tâche et la stocker
+    task = asyncio.create_task(timer_and_stats(qr_row.id))
+    stop_tasks[qr_row.id] = task
+
     return {"status": "QR Code played", "id": qr_row.id, "url": url}
 
 
 @router.post("/qrcode/stop", status_code=status.HTTP_200_OK)
 async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     
+    qr_id = None
     if data.id is not None:
+        qr_id = data.id
         qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
         if not qr_row:
             raise HTTPException(status_code=404, detail="Qrcode not found")
@@ -456,8 +503,13 @@ async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
                    .filter(QrcodeDB.user_id==current_user.id, QrcodeDB.url==data.url) \
                    .first()
         if qr_row:
+            qr_id = qr_row.id
             db.delete(qr_row)
             db.commit()
+
+    if qr_id and qr_id in stop_tasks:
+        stop_tasks[qr_id].cancel()
+        stop_tasks.pop(qr_id, None)
 
     # 2) Publier le FLAG stop
     payload = {"FLAG": "QR_STOP"}
