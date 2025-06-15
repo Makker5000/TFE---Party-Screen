@@ -32,6 +32,8 @@
 
   let token: string;
 
+  let lyricsMode: 'realtime' | 'hardcoded' = 'hardcoded';
+
   onMount(async () => {
     token = localStorage.getItem('token') ?? '';
     // active = data.state === 'play';
@@ -81,11 +83,15 @@
     const nextState = active ? 'play' : 'stop';
     data = { ...data, state: nextState };
 
+    const endpoint = !active ? (lyricsMode === 'realtime' ? '/api/edition/lyrics/play-realtime' : '/api/edition/lyrics/play-hardcoded') : '/api/edition/lyrics/stop';
+    // const endpoint = !active ? (lyricsMode === 'realtime' ? 'http://localhost:8000/api/edition/lyrics/play-realtime' : 'http://localhost:8000/api/edition/lyrics/play-hardcoded') : 'http://localhost:8000/api/edition/lyrics/stop';
+
     if (!active) {
       // const config = { textColor, backgroundColor, font, animation };
       const config = { ...data };
       // await fetch('http://localhost:8000/api/edition/lyrics/play', {
-      await fetch('/api/edition/lyrics/play', {
+      // await fetch('/api/edition/lyrics/play', {
+      await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -96,7 +102,8 @@
       console.log('Play Real-time Lyrics:', config);
     } else {
       // await fetch('http://localhost:8000/api/edition/lyrics/stop', { 
-      await fetch('/api/edition/lyrics/stop', { 
+      // await fetch('/api/edition/lyrics/stop', {
+      await fetch(endpoint, { 
         method: 'POST',
          headers: {
            'Content-Type': 'application/json',
@@ -171,6 +178,15 @@
         on:click={openSavePresetModal}
       >
         Save
+      </button>
+      
+    </div>
+    <div>
+      <button
+        class="btn btn-outline btn-sm hover:bg-pink-400 border-grey-200 hover:border-pink-600"
+        on:click={() => lyricsMode = lyricsMode === 'realtime' ? 'hardcoded' : 'realtime'}
+      >
+        {lyricsMode === 'realtime' ? 'RealTime Lyrics' : 'Hardcoded Lyrics'}
       </button>
     </div>
     <SavePresetModal
