@@ -1,9 +1,9 @@
-import hashlib
-import hmac
-import http
-import time
+# import hashlib
+# import hmac
+# import http
+# import time
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
-from shazamio import Shazam
+# from shazamio import Shazam
 from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel, ArtistVisualDB, QrcodeDB
 from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
