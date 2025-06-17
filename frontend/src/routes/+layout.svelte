@@ -1,7 +1,9 @@
-<script>import '$app/environment';
+<script>
+import '$app/environment';
 import '../app.css';
 import NavBar from '$lib/components/Navbar.svelte';
-import { page } from '$app/stores';</script>
+import { page } from '$app/stores';
+</script>
 <!-- <script>
     import '$app/environment';
 	import '../app.css';

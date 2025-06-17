@@ -363,9 +363,10 @@ async def generate_qrcode(data: QRCodeModel, db: Session = Depends(get_db), curr
         "url": url
     }
 
-
-@router.post("/qrcode/play", status_code=status.HTTP_200_OK)
-async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+# ///////////////////////////////////////////////////////////////////////////////////
+# AVEC envoie MQTT --> AFFICHAGE QR sur Matrices
+@router.post("/qrcode/play/display", status_code=status.HTTP_200_OK)
+async def play_qrcode_display(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     
     # 1) Lecture des settings (on valide la même condition)
     settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
@@ -448,13 +449,11 @@ async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
         try:
             await asyncio.sleep(5)
             # Appel stats
-            # async with httpx.AsyncClient() as client:
-            #     resp = await client.get(STATS_URL)
-            #     resp.raise_for_status()
-            #     stats_data = resp.json()
             resp = await asyncio.to_thread(requests.get, STATS_URL)
             resp.raise_for_status()
             stats_data = resp.json()
+
+            top_title_payload = None  
             if stats_data:
                 top_title = max(stats_data.items(), key=lambda kv: kv[1])[0]
                 top_title_payload = AdsModel (
@@ -470,7 +469,11 @@ async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
                 
             # Puis stop automatique
             publish(MQTT_TOPIC, {"FLAG": "QR_STOP"})
-            await play_ads(top_title_payload)
+
+            # N’appeler play_ads que s’il y a un payload
+            if top_title_payload is not None:
+                await play_ads(top_title_payload)
+
         except asyncio.CancelledError:
             # Task annulée : on ne fait rien
             return
@@ -485,8 +488,121 @@ async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
     return {"status": "QR Code played", "id": qr_row.id, "url": url}
 
 
-@router.post("/qrcode/stop", status_code=status.HTTP_200_OK)
-async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+# SANS envoie MQTT --> PAS AFFICHAGE QR sur Matrices !!!!
+@router.post("/qrcode/play/hide", status_code=status.HTTP_200_OK)
+async def play_qrcode_hide(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    # 1) Lecture des settings (on valide la même condition)
+    settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
+    if not settings_row:
+        sc, mc, shape = 1, 9, "Square"
+    else:
+        sc = int(settings_row.screen_count)
+        mc = int(settings_row.matrix_count)
+        shape = settings_row.screen_shape
+    if not (sc == 1 and mc == 9 and shape == "Square"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Config invalide (screenCount={sc}, matrixCount={mc}, screenShape='{shape}'). "
+                "Seule (1,9,'Square') autorisée."
+            )
+        )
+    
+    qr_row = None
+    url = None
+    raw_b64 = None
+
+    # 2) Si on reçoit un ID
+    if data.id is not None:
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+        raw_b64 = qr_row.data_base64
+        url = qr_row.url
+
+    # 3) Sinon si on reçoit une URL
+    elif data.url:
+        url = data.url
+        # Chercher en DB si déjà existant
+        qr_row = (
+            db.query(QrcodeDB)
+            .filter(QrcodeDB.user_id == current_user.id, QrcodeDB.url == url)
+            .first()
+        )
+        if qr_row:
+            raw_b64 = qr_row.data_base64
+        else:
+            # on génère en mémoire sans PNG, direct raw888
+            qr_img = create_qr_code(url)
+            resized_img = resize_qr_code(qr_img)
+            _, _, raw_b64 = qr_to_raw_base64(resized_img)
+
+            # Créer le record en DB
+            new_qr = QrcodeDB(
+                user_id=current_user.id,
+                url=url,
+                data_base64=raw_b64,
+                preset_id=None
+            )
+            db.add(new_qr)
+            db.commit()
+            db.refresh(new_qr)
+            qr_row = new_qr
+
+    else:
+        raise HTTPException(status_code=422, detail="Il faut fournir `id` ou `url`.")
+
+    # 4) Si l’appel vient d’un preset (dans data.url on pourrait avoir preset_id),
+    #    on met à jour preset_id de ce QR. Mais la page Preset envoie seulement { url }, donc :
+    #    on peut lier simplement le dernier preset de l’utilisateur si utile, ou laisser preset_id à None.
+    #    Vous pouvez adapter ici pour lier au preset qui a lancé l’appel.
+
+    # Fonction interne pour timer, stats et affichage puis stop
+    async def timer_and_stats(qr_id: int):
+        try:
+            # Appel stats
+            resp = await asyncio.to_thread(requests.get, STATS_URL)
+            resp.raise_for_status()
+            stats_data = resp.json()
+
+            top_title_payload = None
+            if stats_data:
+                top_title = max(stats_data.items(), key=lambda kv: kv[1])[0]
+                top_title_payload = AdsModel (
+                    FLAG = "ADS_PLAY",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = top_title,
+                    state = "play",
+                )
+                
+
+            # N’appeler play_ads que s’il y a un payload
+            if top_title_payload is not None:
+                await play_ads(top_title_payload)
+            
+            print("Message ADS publié sur esp/pere/commande !!")
+        except asyncio.CancelledError:
+            # Task annulée : on ne fait rien
+            return
+        finally:
+            # Nettoyer la tâche
+            stop_tasks.pop(qr_id, None)
+
+    # Lancer la tâche et la stocker
+    task = asyncio.create_task(timer_and_stats(qr_row.id))
+    stop_tasks[qr_row.id] = task
+
+    return {"status": "QR Code played", "id": qr_row.id, "url": url}
+
+
+# AVEC envoie MQTT --> AFFICHAGE QR sur Matrices
+@router.post("/qrcode/stop/display", status_code=status.HTTP_200_OK)
+async def stop_qrcode_display(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     
     qr_id = None
     if data.id is not None:
@@ -512,11 +628,68 @@ async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
         stop_tasks.pop(qr_id, None)
 
     # 2) Publier le FLAG stop
-    payload = {"FLAG": "QR_STOP"}
-    publish(MQTT_TOPIC, payload)
+    # payload = {"FLAG": "QR_STOP"}
+    # publish(MQTT_TOPIC, payload)
+
+    stop_display = AdsModel (
+                    FLAG = "ADS_STOP",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = "Stop",
+                    state = "stop",
+                )
+    await stop_ads(stop_display)
 
     return {"status": "QR Code stopped and deleted", "id": data.id}
 
+
+# SANS envoie MQTT --> PAS AFFICHAGE QR sur Matrices !!!!
+@router.post("/qrcode/stop/hide", status_code=status.HTTP_200_OK)
+async def stop_qrcode_hide(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    qr_id = None
+    if data.id is not None:
+        qr_id = data.id
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+
+        # 1) Supprimer de la BD
+        db.delete(qr_row)
+        db.commit()
+    elif data.url:
+        qr_row = db.query(QrcodeDB) \
+                   .filter(QrcodeDB.user_id==current_user.id, QrcodeDB.url==data.url) \
+                   .first()
+        if qr_row:
+            qr_id = qr_row.id
+            db.delete(qr_row)
+            db.commit()
+
+    if qr_id and qr_id in stop_tasks:
+        stop_tasks[qr_id].cancel()
+        stop_tasks.pop(qr_id, None)
+
+    # 2) Publier le FLAG stop
+    # payload = {"FLAG": "QR_STOP"}
+    # publish(MQTT_TOPIC, payload)
+
+    stop_display = AdsModel (
+                    FLAG = "ADS_STOP",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = "Stop",
+                    state = "stop",
+                )
+    await stop_ads(stop_display)
+
+    return {"status": "QR Code stopped and deleted", "id": data.id}
 
 
 # ######################################## LYRICS ############################################

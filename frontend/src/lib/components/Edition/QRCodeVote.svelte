@@ -8,6 +8,8 @@
   let defaultUrl = 'https://tfe-twampi.vercel.app/';
 
   let currentUrl = url || defaultUrl;
+
+  let showOnMatrices = true; 
   
   // NOUVEAU: Variables pour l'affichage de l'image
   let qrImageSrc = '';
@@ -210,54 +212,31 @@
 
   async function toggleQr() {
 
-    if (!qrGenerated || qrId === null) {
-      state = active ? 'play' : 'stop';
-      // Si le preset envoie juste data.url, on peut faire l'appel directement à /play avec { url }
-      // afin de créer le record DB à la volée. Par défaut, on prend qrId si déjà généré localement.
-      data = { url: data.url, state };
-      if (data) {
-        try {
-          // const response = await fetch('http://localhost:8000/api/edition/qrcode/play', {
-          const response = await fetch('/api/edition/qrcode/play', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-          });
-          if (!response.ok) {
-            let detail = `Status ${response.status}`;
-            try { const err = await response.json(); if (err.detail) detail = err.detail; } catch {}
-            throw new Error(detail);
-          }
-          const resPlay = await response.json();
-          qrId = resPlay.id; // si le backend a généré le record à la volée
-          active = true;
-        } catch (err) {
-          console.error('Erreur Play QR:', err);
-          // alert('Erreur lors du play du QR Code : ' + err);
-          toastMessage = "Error while playing QR Code : " + err;
-          toastType = 'error';
-          triggerToast(toastMessage, toastType);
-        }
-        return;
-      } else {
+    if ((!qrGenerated || qrId === null) && state == "play" ) {
         // alert('Impossible de jouer : ni QR généré ni URL fournie.');
         toastMessage = "Unable to play : No QR generated or URL provided.";
         toastType = 'error';
         triggerToast(toastMessage, toastType);
         return;
-      }
     }
 
     // Si qrId existe, on appelle /stop ou /play selon active
-    const endpoint = active
-      ? '/api/edition/qrcode/stop'
-      : '/api/edition/qrcode/play';
+    // const endpoint = active
+    //   ? '/api/edition/qrcode/stop'
+    //   : '/api/edition/qrcode/play';
     // const endpoint = active
     //   ? 'http://localhost:8000/api/edition/qrcode/stop'
     //   : 'http://localhost:8000/api/edition/qrcode/play';
+
+    const base = active
+      ? '/api/edition/qrcode/stop'
+      : '/api/edition/qrcode/play';
+    // const base = active
+    //   ? 'http://localhost:8000/api/edition/qrcode/stop'
+    //   : 'http://localhost:8000/api/edition/qrcode/play';
+    const action = showOnMatrices ? 'display' : 'hide';
+    
+    const endpoint = `${base}/${action}`;
     const payload = { id: qrId, state };
 
     try {
@@ -319,7 +298,7 @@
           <img 
             src={qrImageSrc} 
             alt="QR Code" 
-            class="border-2 border-gray-300 rounded"
+            class="border-2 border-gray-300 rounded w-full h-auto max-w-[128px]"
             style="image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;"
           />
           <p class="text-xs text-gray-500 break-all">{currentUrl}</p>
@@ -343,6 +322,13 @@
         on:click={openSavePresetModal}
       >
         Save
+      </button>
+    </div>
+    <div>
+      <button 
+      on:click={() => showOnMatrices = !showOnMatrices} 
+      class="btn btn-outline btn-sm hover:bg-pink-400 border-grey-200 hover:border-pink-600">
+        {showOnMatrices ? 'Display QR : YES' : 'Display QR : NO'}
       </button>
     </div>
     <SavePresetModal

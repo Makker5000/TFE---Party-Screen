@@ -181,6 +181,8 @@
       </button>
       
     </div>
+
+    <!-- Boutons Hardcoded ou Realtime -->
     <div>
       <button
         class="btn btn-outline btn-sm hover:bg-pink-400 border-grey-200 hover:border-pink-600"
