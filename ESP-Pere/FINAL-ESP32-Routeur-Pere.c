@@ -9,8 +9,9 @@
 const char* AP_SSID      = "MonReseauESP";
 const char* AP_PASS      = "ouiouioui";
 IPAddress local_IP(192, 168, 1, 1);
-IPAddress gateway_IP(192, 168, 1, 1);
+IPAddress gateway_IP(192, 168, 1, 10);
 IPAddress subnet_mask(255, 255, 255, 0);
+IPAddress dns_IP(192, 168, 1, 10); 
 
 // MQTT
 const char* MQTT_BROKER_IP   = "192.168.1.10";
@@ -808,7 +809,7 @@ void reconnectMQTT() {
 
 void setup() {
   Serial.begin(115200);
-  WiFi.softAPConfig(local_IP,gateway_IP,subnet_mask);
+  WiFi.softAPConfig(local_IP, gateway_IP, subnet_mask, dns_IP, dns_IP);
   WiFi.softAP(AP_SSID,AP_PASS, 1, 0, 8);
   initializeChildren();
   mqttClient.setServer(MQTT_BROKER_IP, MQTT_BROKER_PORT);
