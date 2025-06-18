@@ -1063,6 +1063,7 @@ async def stop_lyrics(current_user=Depends(get_current_user)):
 # ######################################## ADS #########################################
 @router.post("/ads/play")
 async def play_ads(data: AdsModel):
+    print("Je lance ads !")
     if data.state != "play":
         return {"status": "error", "detail": "Pas le bon état pour PLAY !"}
     

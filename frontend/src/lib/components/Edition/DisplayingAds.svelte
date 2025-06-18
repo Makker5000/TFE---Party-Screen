@@ -68,7 +68,7 @@
 
   async function toggleAds() {
     // const config = { ...data, state: active ? 'stop' : 'play' };
-    const nextState = active ? 'play' : 'stop';
+    const nextState = active ? 'stop' : 'play';
     data = { ...data, state: nextState };
 
     // const url = active ? 'http://localhost:8000/api/edition/ads/stop' : 'http://localhost:8000/api/edition/ads/play';
