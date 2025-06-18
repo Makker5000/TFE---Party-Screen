@@ -25,25 +25,25 @@ from app.core.config import MQTT_BROKER, MQTT_PORT, MQTT_TOPIC, CA_CERT_PATH, CL
 client = mqtt.Client()
 
 # Chargement du certificat CA pour vérifier le broker
-client.tls_set(
-    ca_certs=CA_CERT_PATH,
-    certfile=CLIENT_CERT,       # ou "path/to/client.crt" si mutual TLS
-    keyfile=CLIENT_KEY,        # ou "path/to/client.key"
-    tls_version=ssl.PROTOCOL_TLSv1_2,
-    ciphers=None
-)
-# Si votre broker a un certificat self-signed et que vous êtes en dev :
-client.tls_insecure_set(True)
+# client.tls_set(
+#     ca_certs=CA_CERT_PATH,
+#     certfile=CLIENT_CERT,       # ou "path/to/client.crt" si mutual TLS
+#     keyfile=CLIENT_KEY,        # ou "path/to/client.key"
+#     tls_version=ssl.PROTOCOL_TLSv1_2,
+#     ciphers=None
+# )
+# # Si votre broker a un certificat self-signed et que vous êtes en dev :
+# client.tls_insecure_set(True)
 
 def connect_mqtt():
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
     except Exception as e:
-        print(f"[MQTT ERROR] Connexion TLS échouée : {e}")
+        print(f"[MQTT ERROR] Connexion échouée : {e}")
 
 def publish(topic: str, payload: dict):
     connect_mqtt()
     message = json.dumps(payload)
     client.publish(topic, message)
-    client.disconnect()
+    # client.disconnect()
     print(f"[MQTT] Message publié sur {topic} : {message}")
