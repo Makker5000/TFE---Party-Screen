@@ -3,6 +3,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 
 from app.db import get_db
 from app import models
@@ -11,7 +12,13 @@ import os
 from datetime import timedelta, datetime
 from typing import Optional
 
+load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY manquant : définissez-le dans l'environnement ou un fichier .env "
+        "(même valeur pour tout le cycle de vie du backend, ex. sur le Raspberry Pi)."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

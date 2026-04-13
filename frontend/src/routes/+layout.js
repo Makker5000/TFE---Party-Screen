@@ -1,37 +1,24 @@
 // src/routes/+layout.js
-// export const load = async ({ url }) => {
-//     const checkSession = async (event) => {
-//         return null; // ou return { user: null }; selon comment tu veux structurer
-//       };
-//     const isLoggedIn = checkSession(); // À faire toi-même
+import { browser } from '$app/environment';
+import { redirect } from '@sveltejs/kit';
 
-//     if (!isLoggedIn && url.pathname !== '/login') {
-//         return {
-//         status: 302,
-//         redirect: '/login'
-//         };
-//     }
-
-//     return {};
-// };
+/**
+ * Pas de SSR : la présence du JWT est lue dans localStorage, indisponible pendant le rendu serveur.
+ * Sans cela, toute page protégée serait redirigée vers /login même avec un token valide.
+ */
+export const ssr = false;
 
 export const load = async ({ url }) => {
-  // mock : on ne vérifie pas vraiment la session pour l'instant
-  const isLoggedIn = false; 
+	if (url.pathname === '/login') {
+		return {};
+	}
 
-  // Si on est déjà sur /login, on ne fait rien (on veut afficher la page de login)
-  if (url.pathname === '/login') {
-    return {}; 
-  }
+	if (browser) {
+		const token = localStorage.getItem('token');
+		if (!token) {
+			redirect(302, '/login');
+		}
+	}
 
-  // Sinon, si pas connecté, on force vers /login
-  if (!isLoggedIn) {
-    return {
-      status: 302,
-      redirect: '/login'
-    };
-  }
-
-  // (si connecté, on peut renvoyer une session fictive ou rien)
-  return {};
+	return {};
 };

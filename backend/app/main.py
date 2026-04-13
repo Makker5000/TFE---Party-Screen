@@ -19,6 +19,10 @@
 #     import uvicorn
 #     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
 
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +35,22 @@ from app.api.edition import router as edition_router
 from app.api.presets import router as presets_router
 from app.api.users import router as users_router
 
-app = FastAPI()
+_log = logging.getLogger("uvicorn.error")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    now = datetime.now(timezone.utc)
+    if now.year < 2024:
+        _log.warning(
+            "Heure UTC suspecte (%s) : vérifier NTP sur l'appareil (timedatectl) ; "
+            "une horloge fausse rend les JWT immédiatement « expirés ».",
+            now.isoformat(),
+        )
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
