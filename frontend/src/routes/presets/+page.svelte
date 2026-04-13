@@ -6,6 +6,8 @@
   import DisplayVisual from '$lib/components/Edition/DisplayVisual.svelte';
   import QRCodeVote from '$lib/components/Edition/QRCodeVote.svelte';
   import RealTimeLyrics from '$lib/components/Edition/RealTimeLyrics.svelte';
+  import { isTokenExpired } from '$lib/utils/jwt';
+    import Toast from '$lib/components/modals/Toast.svelte';
 
   interface Preset {
     id: number;
@@ -27,18 +29,47 @@
     lyrics: RealTimeLyrics
   };
 
+  let showToast = false;
+  let toastMessage = '';
+  let toastType = '';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
+
   onMount(async () => {
-    token = localStorage.getItem('token') ?? '';
+    token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
   });
 
   async function loadPresets() {
     try {
-      // const res = await fetch('http://localhost:8000/api/presets');
-      const res = await fetch('/api/presets');
+      // const res = await fetch('http://localhost:8000/api/presets', {
+      const res = await fetch('/api/presets', {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+      // const res = await fetch('/api/presets');
       if (!res.ok) throw new Error('Failed to load presets');
       presets = await res.json();
     } catch (error) {
-      console.error(error);
+      // console.error(error);
+      toastMessage = "Failed to load presets";
+      toastType = 'error';
+      triggerToast(toastMessage, toastType);
     }
   }
 
@@ -131,7 +162,10 @@
       closeModal();
       await loadPresets();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde : ', error);
+      // console.error('Erreur lors de la sauvegarde : ', error);
+      toastMessage = "Error while saving";
+      toastType = 'error';
+      triggerToast(toastMessage, toastType);
     }
   }
 
@@ -175,6 +209,13 @@
       </div>
     </div>
   {/if}
+
+  <Toast
+    show={showToast}
+    message={toastMessage}
+    type={toastType}
+    onClose={closeToast}
+  />
 </div>
 
 <style>

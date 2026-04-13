@@ -1,4 +1,9 @@
+# import hashlib
+# import hmac
+# import http
+# import time
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
+# from shazamio import Shazam
 from app.models.edition import BrightnessModel, ArtistVisualModel, LyricsModel, AdsModel, QRCodeModel, QRCodePlayModel, ArtistVisualDB, QrcodeDB
 from app.utils.qrcode import create_qr_code, resize_qr_code, qr_to_raw_base64
 from app.utils.mqtt import publish
@@ -24,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.utils.usersAuth import get_current_user
 from app.models.settings import SettingsDB
+from app.utils.normalize_accents import strip_accents
 
 router = APIRouter()
 
@@ -263,9 +269,14 @@ async def stop_visual(db: Session = Depends(get_db), current_user = Depends(get_
 
 
 # ################################### QRCODE ####################################
-DEFAULT_URL = "http://localhost:5173/lyrics"
+DEFAULT_URL = "https://tfe-twampi.vercel.app/"
 UPLOAD_DIR_QRCODE = "app/uploads/qrcodes"
 os.makedirs(UPLOAD_DIR_QRCODE, exist_ok=True)
+
+# URL de stats du serveur 2
+STATS_URL = "https://tfe-twampi-backend.onrender.com/api/stats"
+# Dictionnaire pour garder la trace des tasks par QR id
+stop_tasks: dict[int, asyncio.Task] = {}
 
 @router.post("/qrcode", status_code=status.HTTP_200_OK)
 async def generate_qrcode(data: QRCodeModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
@@ -352,9 +363,10 @@ async def generate_qrcode(data: QRCodeModel, db: Session = Depends(get_db), curr
         "url": url
     }
 
-
-@router.post("/qrcode/play", status_code=status.HTTP_200_OK)
-async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+# ///////////////////////////////////////////////////////////////////////////////////
+# AVEC envoie MQTT --> AFFICHAGE QR sur Matrices
+@router.post("/qrcode/play/display", status_code=status.HTTP_200_OK)
+async def play_qrcode_display(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     
     # 1) Lecture des settings (on valide la même condition)
     settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
@@ -432,13 +444,169 @@ async def play_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
     }
     publish(MQTT_TOPIC, payload)
 
+    # Fonction interne pour timer, stats et affichage puis stop
+    async def timer_and_stats(qr_id: int):
+        try:
+            await asyncio.sleep(5)
+            # Appel stats
+            resp = await asyncio.to_thread(requests.get, STATS_URL)
+            resp.raise_for_status()
+            stats_data = resp.json()
+
+            top_title_payload = None  
+            if stats_data:
+                top_title = max(stats_data.items(), key=lambda kv: kv[1])[0]
+                top_title_payload = AdsModel (
+                    FLAG = "ADS_PLAY",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = top_title,
+                    state = "play",
+                )
+                
+            # Puis stop automatique
+            publish(MQTT_TOPIC, {"FLAG": "QR_STOP"})
+
+            # N’appeler play_ads que s’il y a un payload
+            if top_title_payload is not None:
+                await play_ads(top_title_payload)
+
+        except asyncio.CancelledError:
+            # Task annulée : on ne fait rien
+            return
+        finally:
+            # Nettoyer la tâche
+            stop_tasks.pop(qr_id, None)
+
+    # Lancer la tâche et la stocker
+    task = asyncio.create_task(timer_and_stats(qr_row.id))
+    stop_tasks[qr_row.id] = task
+
     return {"status": "QR Code played", "id": qr_row.id, "url": url}
 
 
-@router.post("/qrcode/stop", status_code=status.HTTP_200_OK)
-async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+# SANS envoie MQTT --> PAS AFFICHAGE QR sur Matrices !!!!
+@router.post("/qrcode/play/hide", status_code=status.HTTP_200_OK)
+async def play_qrcode_hide(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     
+    # 1) Lecture des settings (on valide la même condition)
+    settings_row = db.query(SettingsDB).order_by(SettingsDB.id.desc()).first()
+    if not settings_row:
+        sc, mc, shape = 1, 9, "Square"
+    else:
+        sc = int(settings_row.screen_count)
+        mc = int(settings_row.matrix_count)
+        shape = settings_row.screen_shape
+    if not (sc == 1 and mc == 9 and shape == "Square"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Config invalide (screenCount={sc}, matrixCount={mc}, screenShape='{shape}'). "
+                "Seule (1,9,'Square') autorisée."
+            )
+        )
+    
+    qr_row = None
+    url = None
+    raw_b64 = None
+
+    # 2) Si on reçoit un ID
     if data.id is not None:
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+        raw_b64 = qr_row.data_base64
+        url = qr_row.url
+
+    # 3) Sinon si on reçoit une URL
+    elif data.url:
+        url = data.url
+        # Chercher en DB si déjà existant
+        qr_row = (
+            db.query(QrcodeDB)
+            .filter(QrcodeDB.user_id == current_user.id, QrcodeDB.url == url)
+            .first()
+        )
+        if qr_row:
+            raw_b64 = qr_row.data_base64
+        else:
+            # on génère en mémoire sans PNG, direct raw888
+            qr_img = create_qr_code(url)
+            resized_img = resize_qr_code(qr_img)
+            _, _, raw_b64 = qr_to_raw_base64(resized_img)
+
+            # Créer le record en DB
+            new_qr = QrcodeDB(
+                user_id=current_user.id,
+                url=url,
+                data_base64=raw_b64,
+                preset_id=None
+            )
+            db.add(new_qr)
+            db.commit()
+            db.refresh(new_qr)
+            qr_row = new_qr
+
+    else:
+        raise HTTPException(status_code=422, detail="Il faut fournir `id` ou `url`.")
+
+    # 4) Si l’appel vient d’un preset (dans data.url on pourrait avoir preset_id),
+    #    on met à jour preset_id de ce QR. Mais la page Preset envoie seulement { url }, donc :
+    #    on peut lier simplement le dernier preset de l’utilisateur si utile, ou laisser preset_id à None.
+    #    Vous pouvez adapter ici pour lier au preset qui a lancé l’appel.
+
+    # Fonction interne pour timer, stats et affichage puis stop
+    async def timer_and_stats(qr_id: int):
+        try:
+            # Appel stats
+            resp = await asyncio.to_thread(requests.get, STATS_URL)
+            resp.raise_for_status()
+            stats_data = resp.json()
+
+            top_title_payload = None
+            if stats_data:
+                top_title = max(stats_data.items(), key=lambda kv: kv[1])[0]
+                top_title_payload = AdsModel (
+                    FLAG = "ADS_PLAY",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = top_title,
+                    state = "play",
+                )
+                
+
+            # N’appeler play_ads que s’il y a un payload
+            if top_title_payload is not None:
+                await play_ads(top_title_payload)
+            
+            print("Message ADS publié sur esp/pere/commande !!")
+        except asyncio.CancelledError:
+            # Task annulée : on ne fait rien
+            return
+        finally:
+            # Nettoyer la tâche
+            stop_tasks.pop(qr_id, None)
+
+    # Lancer la tâche et la stocker
+    task = asyncio.create_task(timer_and_stats(qr_row.id))
+    stop_tasks[qr_row.id] = task
+
+    return {"status": "QR Code played", "id": qr_row.id, "url": url}
+
+
+# AVEC envoie MQTT --> AFFICHAGE QR sur Matrices
+@router.post("/qrcode/stop/display", status_code=status.HTTP_200_OK)
+async def stop_qrcode_display(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    qr_id = None
+    if data.id is not None:
+        qr_id = data.id
         qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
         if not qr_row:
             raise HTTPException(status_code=404, detail="Qrcode not found")
@@ -446,177 +614,364 @@ async def stop_qrcode(data: QRCodePlayModel, db: Session = Depends(get_db), curr
         # 1) Supprimer de la BD
         db.delete(qr_row)
         db.commit()
+    elif data.url:
+        qr_row = db.query(QrcodeDB) \
+                   .filter(QrcodeDB.user_id==current_user.id, QrcodeDB.url==data.url) \
+                   .first()
+        if qr_row:
+            qr_id = qr_row.id
+            db.delete(qr_row)
+            db.commit()
+
+    if qr_id and qr_id in stop_tasks:
+        stop_tasks[qr_id].cancel()
+        stop_tasks.pop(qr_id, None)
 
     # 2) Publier le FLAG stop
-    payload = {"FLAG": "QR_STOP"}
-    publish(MQTT_TOPIC, payload)
+    # payload = {"FLAG": "QR_STOP"}
+    # publish(MQTT_TOPIC, payload)
+
+    stop_display = AdsModel (
+                    FLAG = "ADS_STOP",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = "Stop",
+                    state = "stop",
+                )
+    await stop_ads(stop_display)
 
     return {"status": "QR Code stopped and deleted", "id": data.id}
 
 
+# SANS envoie MQTT --> PAS AFFICHAGE QR sur Matrices !!!!
+@router.post("/qrcode/stop/hide", status_code=status.HTTP_200_OK)
+async def stop_qrcode_hide(data: QRCodePlayModel, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    qr_id = None
+    if data.id is not None:
+        qr_id = data.id
+        qr_row = db.query(QrcodeDB).filter(QrcodeDB.id == data.id, QrcodeDB.user_id == current_user.id).first()
+        if not qr_row:
+            raise HTTPException(status_code=404, detail="Qrcode not found")
+
+        # 1) Supprimer de la BD
+        db.delete(qr_row)
+        db.commit()
+    elif data.url:
+        qr_row = db.query(QrcodeDB) \
+                   .filter(QrcodeDB.user_id==current_user.id, QrcodeDB.url==data.url) \
+                   .first()
+        if qr_row:
+            qr_id = qr_row.id
+            db.delete(qr_row)
+            db.commit()
+
+    if qr_id and qr_id in stop_tasks:
+        stop_tasks[qr_id].cancel()
+        stop_tasks.pop(qr_id, None)
+
+    # 2) Publier le FLAG stop
+    # payload = {"FLAG": "QR_STOP"}
+    # publish(MQTT_TOPIC, payload)
+
+    stop_display = AdsModel (
+                    FLAG = "ADS_STOP",
+                    textColor = "white",
+                    backgroundColor = "black",
+                    font = "Arial",
+                    animation = "none",
+                    speed = 1,
+                    content = "Stop",
+                    state = "stop",
+                )
+    await stop_ads(stop_display)
+
+    return {"status": "QR Code stopped and deleted", "id": data.id}
+
 
 # ######################################## LYRICS ############################################
-# UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
-# UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
+UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
 
-# AUDIO_PATH = UPLOAD_DIR_LYRICS / "test.wav"
+AUDIO_PATH = UPLOAD_DIR_LYRICS / "test.wav"
 
-# playing_lyrics: Union[asyncio.Task, None] = None
+playing_lyrics: Union[asyncio.Task, None] = None
 
-# async def record_and_get_path(durée: int = 15) -> Path:
-#     # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
-#     # cmd = [
-#     #     "arecord",
-#     #     "-D", "plughw:1,0",        # adapte à ton device
-#     #     "-f", "cd",
-#     #     "-t", "wav",
-#     #     "-d", str(durée),
-#     #     str(AUDIO_PATH)
-#     # ]
-#     # subprocess.run(cmd, check=True)
-#     # return AUDIO_PATH
+async def record_and_get_path(durée: int = 4) -> Path:
+    # # Lance arecord pour 'durée' secondes /!\ --> UNIQUEMENT sous Linux !!! /!\
+    # cmd = [
+    #     "arecord",
+    #     "-D", "plughw:1,0",        # adapte à ton device
+    #     "-f", "cd",
+    #     "-t", "wav",
+    #     "-d", str(durée),
+    #     str(AUDIO_PATH)
+    # ]
+    # subprocess.run(cmd, check=True)
+    # return AUDIO_PATH
 
-#     sample_rate = 44100  # Qualité CD
-#     print(f"📢 Enregistrement audio de {durée} secondes...")
-#     audio = sd.rec(int(durée * sample_rate), samplerate=sample_rate, channels=2)
-#     sd.wait()  # Attend la fin de l'enregistrement
-#     write(str(AUDIO_PATH), sample_rate, audio)
-#     return AUDIO_PATH
+    sample_rate = 22050  # Qualité CD
+    print(f"📢 Enregistrement audio de {durée} secondes...")
+    audio = sd.rec(int(durée * sample_rate), samplerate=sample_rate, channels=2)
+    sd.wait()  # Attend la fin de l'enregistrement
+    write(str(AUDIO_PATH), sample_rate, audio)
+    return AUDIO_PATH
 
-
-# def recognize_music_with_audd(file_path: str) -> dict:
-#     """
-#     Envoie un fichier audio à l'API AudD pour reconnaissance musicale.
+# ////////////////////////// Reconnaissance avec AudD (Trial Free expired (5$/month)) //////////////////////////
+def recognize_music_with_audd(file_path: str) -> dict:
+    """
+    Envoie un fichier audio à l'API AudD pour reconnaissance musicale.
     
+    Args:
+        file_path (str): Chemin vers le fichier audio.
+        api_token (str): Clé API AudD.
+
+    Returns:
+        dict: Dictionnaire contenant l'artiste, le titre, ou une erreur.
+    """
+    url = "https://api.audd.io/"
+
+    load_dotenv()  # lit ton .env
+
+    api_token = os.getenv("AUDD_TOKEN")
+
+    with open(file_path, 'rb') as audio_file:
+        files = {
+            'file': audio_file,
+        }
+        data = {
+            'api_token': api_token,
+            'return': 'apple_music,spotify',  # tu peux enlever si tu veux moins de données
+        }
+
+        response = requests.post(url, data=data, files=files)
+    
+    if response.status_code == 200:
+        result = response.json()
+        if result.get("status") == "success" and result.get("result"):
+            title = result["result"].get("title")
+            artist = result["result"].get("artist")
+            return {"title": title, "artist": artist}
+        else:
+            return {"error": "Musique non reconnue."}
+    else:
+        return {"error": f"Erreur API: {response.status_code} - {response.text}"}
+
+# ////////////////////// Reconnaissance avec ACRCloud (Ne Fonctionne PAS !!) ///////////////////////
+# def recognize_music_with_acrcloud(file_path: str) -> dict:
+#     """
+#     Envoie un fichier audio à l'API ACRCloud pour reconnaissance musicale.
+
 #     Args:
 #         file_path (str): Chemin vers le fichier audio.
-#         api_token (str): Clé API AudD.
 
 #     Returns:
 #         dict: Dictionnaire contenant l'artiste, le titre, ou une erreur.
 #     """
-#     url = "https://api.audd.io/"
+#     load_dotenv()
 
-#     load_dotenv()  # lit ton .env
+#     host = os.getenv("ACR_HOST")
+#     access_key = os.getenv("ACR_ACCESS_KEY")
+#     access_secret = os.getenv("ACR_ACCESS_SECRET")
+#     endpoint = "/v1/identify"
+#     url = f"https://{host}{endpoint}"
 
-#     api_token = os.getenv("AUDD_TOKEN")
+#     print("HOST   :", host)
+#     print("URL    :", url)
 
-#     with open(file_path, 'rb') as audio_file:
-#         files = {
-#             'file': audio_file,
-#         }
-#         data = {
-#             'api_token': api_token,
-#             'return': 'apple_music,spotify',  # tu peux enlever si tu veux moins de données
-#         }
+#     http_method = "POST"
+#     http_uri = endpoint
+#     data_type = "audio"
+#     signature_version = "1"
+#     timestamp = str(int(time.time()))
 
-#         response = requests.post(url, data=data, files=files)
-    
+#     string_to_sign = "\n".join([http_method, http_uri, access_key, data_type, signature_version, timestamp])
+#     sign = base64.b64encode(
+#         hmac.new(access_secret.encode('ascii'), string_to_sign.encode('ascii'), digestmod=hashlib.sha1).digest()
+#     ).decode('ascii')
+
+#     # with open(file_path, 'rb') as f:
+#     #     sample_bytes = f.read()
+
+#     # files = {
+#     #     'sample': ('sample.mp3', sample_bytes),
+#     # }
+
+#     data = {
+#         'access_key': access_key,
+#         'data_type': data_type,
+#         'signature_version': signature_version,
+#         'signature': sign,
+#         'timestamp': timestamp,
+#     }
+
+#     print(f"""
+#             Access_key : {access_key}\n
+#             Data_type : {data_type}\n
+#             signature_version : {signature_version}\n
+#             signature : {sign}\n
+#             timestamp : {timestamp}
+#           """)
+
+#     with open(file_path, 'rb') as f:
+#         print("Envoi du fichier:", file_path, "(", os.path.getsize(file_path), "bytes )")
+#         files = {'sample': f}
+#         response = requests.post(url, files=files, data=data)
+
+#     # print(f"File size: {len(sample_bytes)} bytes")
+#     # response = requests.post(url, files=files, data=data)
+#     print("=== Status Code ===", response.status_code)
+#     print("=== Réponse brute ===", response.json())
+
 #     if response.status_code == 200:
 #         result = response.json()
-#         if result.get("status") == "success" and result.get("result"):
-#             title = result["result"].get("title")
-#             artist = result["result"].get("artist")
+#         status_code = result.get("status", {}).get("code")
+#         if status_code == 0:
+#             metadata = result.get("metadata", {})
+#             music_info = metadata.get("music", [{}])[0]
+#             title = music_info.get("title")
+#             artist = music_info.get("artists", [{}])[0].get("name")
 #             return {"title": title, "artist": artist}
 #         else:
-#             return {"error": "Musique non reconnue."}
+#             return {"error": "Musique non reconnue ou hors base de données."}
 #     else:
 #         return {"error": f"Erreur API: {response.status_code} - {response.text}"}
-    
 
-# def get_lyrics(data: dict):
-#     title = data.get("title")
-#     artist = data.get("artist")
+# ///////////////////// Reconnsaissance avec ShazamIO /////////////////
+# def _run_coroutine(coro):
+#     """
+#     Lance une coroutine de façon synchrone, même si on est déjà dans un event loop.
+#     """
+#     try:
+#         loop = asyncio.get_event_loop()
+#     except RuntimeError:
+#         # Pas d’event loop courant
+#         return asyncio.run(coro)
 
-#     if not title or not artist:
-#         raise HTTPException(status_code=400, detail="Title and artist are required")
-
-#     base_url = "https://api.lyrics.ovh/v1"
-#     url = f"{base_url}/{artist}/{title}"
-
-#     response = requests.get(url)
-
-#     if response.status_code == 200:
-#         lyrics_data = response.json()
-#         return {"lyrics": lyrics_data.get("lyrics", "No lyrics found.")}
+#     if loop.is_running():
+#         # Crée un nouveau loop pour exécuter la coroutine
+#         new_loop = asyncio.new_event_loop()
+#         try:
+#             return new_loop.run_until_complete(coro)
+#         finally:
+#             new_loop.close()
 #     else:
-#         raise HTTPException(status_code=404, detail="Lyrics not found.")
-    
+#         return loop.run_until_complete(coro)
 
-# async def play_lyrics_blocks(lyrics_data: dict, topic: str):
-#     lyrics = lyrics_data.get("lyrics", "")
-    
-#     # Découpage des paroles en phrases (chaque ligne non vide ou bloc de texte)
-#     blocks = [line.strip() for line in re.split(r'\r?\n+', lyrics) if line.strip()]
-    
+# def recognize_music_with_shazamio(file_path: str) -> dict:
+#     """
+#     Reconnaît un extrait audio via Shazam (sans API key).
 
-#     for i, block in enumerate(blocks, 1):
-#         payload = {
-#             "FLAG": "LYRICS_BLOCK",
-#             "index": i,
-#             "text": block
+#     Args:
+#         file_path (str): Chemin vers le fichier audio (MP3, WAV, etc).
+
+#     Returns:
+#         dict: {'title': ..., 'artist': ...} ou {'error': ...}.
+#     """
+#     async def _async_recognize():
+#         shazam = Shazam()
+#         out = await shazam.recognize_song(file_path)
+#         track = out.get('track')
+#         if not track:
+#             return {"error": "Musique non reconnue par Shazamio."}
+#         return {
+#             "title": track.get('title'),
+#             "artist": track.get('subtitle')
 #         }
-#         publish(topic, payload)
-#         print(f"Bloc {i} envoyé : {block}")
-#         await asyncio.sleep(3)
 
-#     # Message de fin
-#     publish(topic, {"FLAG": "LYRICS_STOP"})
-#     print("🎉 Tous les lyrics ont été envoyés !")
+#     try:
+#         return _run_coroutine(_async_recognize())
+#     except Exception as e:
+#         return {"error": f"Erreur Shazamio: {e}"}
+    
+# //////////////////////////////////////////////////////
+    
+
+def get_lyrics(data: dict):
+    title = data.get("title")
+    artist = data.get("artist")
+
+    if not title or not artist:
+        raise HTTPException(status_code=400, detail="Title and artist are required")
+
+    base_url = "https://api.lyrics.ovh/v1"
+    url = f"{base_url}/{artist}/{title}"
+
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        lyrics_data = response.json()
+        return {"lyrics": lyrics_data.get("lyrics", "No lyrics found.")}
+    else:
+        raise HTTPException(status_code=404, detail="Lyrics not found.")
+    
+
+async def play_lyrics_blocks(lyrics_data: dict, topic: str):
+    lyrics = lyrics_data.get("lyrics", "")
+    
+    # Découpage des paroles en phrases (chaque ligne non vide ou bloc de texte)
+    blocks = [line.strip() for line in re.split(r'\r?\n+', lyrics) if line.strip()]
+    
+
+    for i, block in enumerate(blocks, 1):
+        payload = {
+            "FLAG": "LYRICS_BLOCK",
+            "index": i,
+            "text": block
+        }
+        publish(topic, payload)
+        print(f"Bloc {i} envoyé : {block}")
+        await asyncio.sleep(3)
+
+    # Message de fin
+    publish(topic, {"FLAG": "LYRICS_STOP"})
+    print("🎉 Tous les lyrics ont été envoyés !")
 
 
-# @router.post("/lyrics/play")
-# async def play_lyrics(data: LyricsModel, current_user = Depends(get_current_user)):
-#     global playing_lyrics
+@router.post("/lyrics/play-realtime")
+async def play_lyrics(data: LyricsModel, current_user = Depends(get_current_user)):
+    global playing_lyrics
 
-#     # Stoppe la tâche précédente si elle existe
-#     if playing_lyrics is not None and not playing_lyrics.done():
-#         playing_lyrics.cancel()
-#         try:
-#             await playing_lyrics
-#         except asyncio.CancelledError:
-#             print("Ancienne tâche annulée")
+    # Stoppe la tâche précédente si elle existe
+    if playing_lyrics is not None and not playing_lyrics.done():
+        playing_lyrics.cancel()
+        try:
+            await playing_lyrics
+        except asyncio.CancelledError:
+            print("Ancienne tâche annulée")
 
-#     payload = { "FLAG": "LYRICS_PLAY", **data.dict() }
-#     publish(MQTT_TOPIC, payload)
+    payload = { "FLAG": "LYRICS_PLAY", **data.dict() }
+    publish(MQTT_TOPIC, payload)
 
-#     # Enregistrement Audio de 5sec pour l'envoyer à API Reconnaissance Musicale
-#     # audio_file = await record_and_get_path(durée=10)
-#     # if audio_file != 0:
-#     #     print("Fichier Audio créer et enregistré !")
+    # Enregistrement Audio de 5sec pour l'envoyer à API Reconnaissance Musicale
+    audio_file = await record_and_get_path(durée=10)
+    if audio_file != 0:
+        print("Fichier Audio créer et enregistré !")
 
-#     # Envoyer le Son à l'API AudD et récupérer Titre + Artiste
-#     # meta_data = recognize_music_with_audd(audio_file)
-#     # print(f"Titre et Artiste reconnu par AudD : {meta_data}")
+    # Envoyer le Son à l'API AudD et récupérer Titre + Artiste
+    meta_data = recognize_music_with_audd(audio_file)
+    # meta_data = recognize_music_with_acrcloud(audio_file)
+    # meta_data = recognize_music_with_shazamio(audio_file)
+    print(f"Titre et Artiste reconnu : {meta_data}")
 
-#     # chanson1 = {'title': "La vie qu'on mène", 'artist': 'Ninho'}
+    # chanson1 = {'title': "La vie qu'on mène", 'artist': 'Ninho'}
 
-#     # Récupération des Paroles de la chanson détectée
-#     # lyrics_data = get_lyrics(meta_data)
-#     lyrics_data = {'lyrics': "No me importa lo que de mí se diga\r\nVida usted su vida, que yo vivo la mia\r\nQue solo es una, disfruta el momento\r\nQue el tiempo se acaba y pa'trás no vira\r\nBebiendo, fumando y jodiendo\n\nSigo vacilando de party to' los día'\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (¡Farru!)\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (La rola y pepa)\n\n\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\n\n\nDesacata'o\n\nEmpastilla'o\n\n(Qué maldita nota)\n\n(Arcoíris)\n\n¡Fa-Farru!\n\n\n\n"}
-#     print(f"Les Lyrics du son capté : {lyrics_data}")
+    # Récupération des Paroles de la chanson détectée
+    lyrics_data = get_lyrics(meta_data)
+    # lyrics_data = {'lyrics': "No me importa lo que de mí se diga\r\nVida usted su vida, que yo vivo la mia\r\nQue solo es una, disfruta el momento\r\nQue el tiempo se acaba y pa'trás no vira\r\nBebiendo, fumando y jodiendo\n\nSigo vacilando de party to' los día'\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (¡Farru!)\n\nSíguelo, oh-oh-oh, oh-oh-oh, oh-oh (La rola y pepa)\n\n\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\nPepa y agua pa' la seca\n\nTo' el mundo en pastilla en la discoteca\n\n\n\nDesacata'o\n\nEmpastilla'o\n\n(Qué maldita nota)\n\n(Arcoíris)\n\n¡Fa-Farru!\n\n\n\n"}
+    print(f"Les Lyrics du son capté : {lyrics_data}")
 
-#     # Découpage et envoie des Paroles par blocs via MQTT
-#     playing_lyrics = asyncio.create_task(play_lyrics_blocks(lyrics_data, MQTT_TOPIC))
+    # Découpage et envoie des Paroles par blocs via MQTT
+    playing_lyrics = asyncio.create_task(play_lyrics_blocks(lyrics_data, MQTT_TOPIC))
 
-#     return {"status": "ok"}
+    return {"status": "ok"}
 
-# @router.post("/lyrics/stop")
-# async def stop_lyrics(current_user = Depends(get_current_user)):
-#     global playing_lyrics
 
-#     if playing_lyrics is not None and not playing_lyrics.done():
-#         playing_lyrics.cancel()
-#         try:
-#             await playing_lyrics
-#         except asyncio.CancelledError:
-#             print("Tâche lyrics annulée")
-
-#     publish(MQTT_TOPIC, { "FLAG": "LYRICS_STOP" })
-#     return {"status": "ok"}
-
-UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
-UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
+# UPLOAD_DIR_LYRICS = Path("./app/uploads/lyrics")
+# UPLOAD_DIR_LYRICS.mkdir(parents=True, exist_ok=True)
 
 LRC_PATH = UPLOAD_DIR_LYRICS / "jetemmeneauvent_lyrics.lrc"
 
@@ -651,11 +1006,13 @@ async def play_lyrics_from_lrc(topic: str):
         delay = (start + ts) - now
         if delay > 0:
             await asyncio.sleep(delay)
+        
+        clean_lyrics = strip_accents(text)
 
         payload = {
             "FLAG": "LYRICS_BLOCK",
             "time": ts,
-            "text": text
+            "text": clean_lyrics
         }
         publish(topic, payload)
         print(f"[{ts:06.2f}] → {text}")
@@ -664,7 +1021,7 @@ async def play_lyrics_from_lrc(topic: str):
     publish(topic, {"FLAG": "LYRICS_STOP"})
     print("🎉 Lecture terminée")
 
-@router.post("/lyrics/play")
+@router.post("/lyrics/play-hardcoded")
 async def play_lyrics(data: LyricsModel, current_user=Depends(get_current_user)):
     global playing_lyrics
 
@@ -685,6 +1042,8 @@ async def play_lyrics(data: LyricsModel, current_user=Depends(get_current_user))
 
     return {"status": "ok", "message": "Lecture lancée, calée sur le LRC"}
 
+
+
 @router.post("/lyrics/stop")
 async def stop_lyrics(current_user=Depends(get_current_user)):
     global playing_lyrics
@@ -704,17 +1063,26 @@ async def stop_lyrics(current_user=Depends(get_current_user)):
 # ######################################## ADS #########################################
 @router.post("/ads/play")
 async def play_ads(data: AdsModel):
+    print("Je lance ads !")
+    if data.state != "play":
+        return {"status": "error", "detail": "Pas le bon état pour PLAY !"}
+    
     if data.state == "play":
         print(f"Contenu du message : {data.content}")
         print(f"State = {data.state}")
-        payload = { "FLAG": "ADS_PLAY", **data.dict() } # Faire en sorte d'exclure la balise 'state' !
+        clean_content = strip_accents(data.content)
+        payload = { "FLAG": "ADS_PLAY", **data.dict(), "content": clean_content } # Faire en sorte d'exclure la balise 'state' !
         publish(MQTT_TOPIC, payload)
+        print(f"Le payload du message envoyé : {payload}")
     else:
         return "Pas le bon état pour PLAY !"
     return {"status": "ok"}
 
 @router.post("/ads/stop")
 async def stop_ads(data: AdsModel):
+    if data.state != "stop":
+        return {"status": "error", "detail": "Pas le bon état pour STOP !"}
+    
     if data.state == "stop":
         print(f"Arrêt de l'affichage du message : {data.content} !!")
         print(f"State = {data.state}")

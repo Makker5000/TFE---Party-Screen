@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isTokenExpired } from '$lib/utils/jwt';
   import { onMount } from 'svelte';
 
   let username = '';
@@ -11,9 +12,49 @@
 
   let token: string;
 
+  let showToast = false;
+  let toastMessage = '';
+  let toastType = '';
+
+  function triggerToast(msg: string, type = 'info') {
+    toastMessage = msg;
+    toastType = type;
+    showToast = true;
+  }
+
+  function closeToast() {
+    showToast = false;
+  }
+
   onMount(() => {
-    token = localStorage.getItem('token') ?? '';
+    token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
+    getCurrentUser();
   });
+
+  async function getCurrentUser() {
+    try {
+      // const res = await fetch('http://localhost:8000/api/users/myself', {
+      const res = await fetch('/api/users/myself', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la récupération de l'utilisateur");
+      }
+
+      const data = await res.json();
+      username = data.username;
+    } catch (err) {
+      console.error(err);
+    }
+  }
   
   async function updateUsername(newUsername: string) {
     // Appel API ou logique de mise à jour
@@ -37,10 +78,16 @@
         alert(data.message);
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error while changing name";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert(`Username mis à jour : ${username}`);
+    toastMessage = "Username changed successfully";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function updatePassword(currentPassword: string, newPassword: string) {
@@ -68,10 +115,16 @@
         alert(data.message);
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error while changing password";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert(`Mot de passe mis à jour : ${password}`);
+    toastMessage = "Password changed successfully";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function createAccount(username: string, email: string, password: string) {
@@ -94,10 +147,13 @@
         const data = await res.json();
 
         if (!res.ok) {
-            throw new Error(data.detail || 'Erreur lors de l\'inscription');
+            // throw new Error(data.detail || 'Erreur lors de l\'inscription');
+            toastMessage = "Error during registration";
+            toastType = 'error';
+            triggerToast(toastMessage, toastType);
         }
 
-        alert(data.message);
+        // alert(data.message);
         // Rediriger vers login si tout va bien
         window.location.href = '/login';
     } catch (err) {
@@ -129,10 +185,16 @@
         window.location.href = '/login';
     } catch (err) {
         console.error(err);
-        alert(err.message);
+        // alert(err.message);
+        toastMessage = "Error during log out";
+        toastType = 'error';
+        triggerToast(toastMessage, toastType);
     }
 
     // alert('Déconnexion effectuée');
+    toastMessage = "Log out successful";
+    toastType = 'success';
+    triggerToast(toastMessage, toastType);
   }
 
   async function deleteAccount() {
@@ -141,7 +203,7 @@
     //   alert('Compte supprimé');
     // }
 
-    if (!confirm("Es-tu sûr de vouloir supprimer ton compte ?")) return;
+    if (!confirm("Are you sure you want to delete your account ?")) return;
 
     try {
         // const res = await fetch('http://localhost:8000/api/users/delete', {
@@ -154,7 +216,10 @@
 
         if (!res.ok) {
             const data = await res.json();
-            throw new Error(data.detail || 'Erreur lors de la suppression');
+            // throw new Error(data.detail || 'Erreur lors de la suppression');
+            toastMessage = "Error deleting";
+            toastType = 'error';
+            triggerToast(toastMessage, toastType);
         }
 
         const data = await res.json();
@@ -174,9 +239,10 @@
 </svelte:head>
 
 <div class="min-h-screen bg-pink-50 flex flex-col items-center py-8 px-4">
-  <h1 class="text-center text-black text-4xl font-bold mb-8">Account</h1>
+  <h1 class="text-center text-black text-4xl font-bold mb-4">Account</h1>
+  <h2 class="text-center text-black text-lg font-medium mb-4 animate-slide-in">Bonjour <span class="text-blue-500 font-semibold">{username}</span> !</h2>
 
-  <div class="w-full max-w-md space-y-6">
+  <div class="w-full max-w-md space-y-6 mt-0">
 
     <!-- Modifier Username -->
     <div class="card bg-base-100 shadow-md mx-auto">
@@ -188,7 +254,7 @@
           bind:value={newUsername}
           class="input input-bordered w-full"
         />
-        <button class="btn btn-primary mt-4" on:click={() => updateUsername(username)}>Update</button>
+        <button class="btn btn-primary mt-4" on:click={() => updateUsername(newUsername)}>Update</button>
       </div>
     </div>
 

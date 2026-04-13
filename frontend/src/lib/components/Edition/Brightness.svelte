@@ -36,8 +36,8 @@
 <div class="flex justify-center items-center py-4">
   <input
     type="range"
-    min="0"
-    max="255"
+    min="10"
+    max="170"
     bind:value={currentBrightness}
     on:change={handleChange}
     class="range range-accent range-lg w-3/4"

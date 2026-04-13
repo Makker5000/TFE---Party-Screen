@@ -4,6 +4,18 @@
   import QRCodeVote from '$lib/components/Edition/QRCodeVote.svelte';
   import RealTimeLyrics from '$lib/components/Edition/RealTimeLyrics.svelte';
   import DisplayingAds from '$lib/components/Edition/DisplayingAds.svelte';
+  import { onMount } from 'svelte';
+  import { isTokenExpired } from '$lib/utils/jwt';
+
+  onMount(async () => {
+    // Vérification de la Session avec le Token
+    const token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      alert('Session expirée, veuillez vous reconnecter.');
+      localStorage.removeItem('token');
+      window.location.href = '/login'; // ou utilise goto('/login') si tu veux éviter un reload complet
+    }
+  });
 </script>
 
 <svelte:head>
@@ -11,7 +23,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-pink-50 flex flex-col items-center py-8 px-4">
-  <h1 class="text-center text-black text-4xl font-bold mb-8">Page Edition</h1>
+  <h1 class="text-center text-black text-4xl font-bold mb-8">Edition</h1>
 
   <div class="w-full max-w-md space-y-6">
     <!-- Brightness Component -->
